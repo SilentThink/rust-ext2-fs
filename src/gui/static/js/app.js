@@ -10,6 +10,13 @@ const terminalContentElement = document.getElementById('terminal-content');
 const terminalInputElement = document.getElementById('terminal-input');
 const promptElement = document.getElementById('prompt');
 
+// 右键菜单和对话框元素
+const contextMenu = document.getElementById('context-menu');
+const createFileModal = document.getElementById('create-file-modal');
+const createFolderModal = document.getElementById('create-folder-modal');
+const fileNameInput = document.getElementById('file-name');
+const folderNameInput = document.getElementById('folder-name');
+
 // 设置终端最大显示行数
 const MAX_TERMINAL_LINES = 100;
 
@@ -24,7 +31,154 @@ document.addEventListener('DOMContentLoaded', () => {
     // 初始化终端欢迎信息
     appendToTerminal('欢迎使用Ext2文件系统可视化界面！', 'system');
     appendToTerminal('输入 "help" 或 "?" 获取可用命令列表。', 'system');
+    
+    // 设置右键菜单事件
+    setupContextMenu();
+    
+    // 设置对话框事件
+    setupModals();
 });
+
+// 设置右键菜单
+function setupContextMenu() {
+    // 为整个文件浏览器区域添加右键菜单
+    const fileExplorer = document.querySelector('.file-explorer');
+    
+    fileExplorer.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        console.log('文件浏览器区域右键点击被触发');
+        
+        // 如果点击的是文件项，不显示菜单
+        if (e.target.closest('.file-item')) {
+            console.log('点击了文件项，不显示菜单');
+            return;
+        }
+        
+        // 获取鼠标位置
+        const x = e.clientX || e.pageX;
+        const y = e.clientY || e.pageY;
+        
+        console.log(`右键菜单位置: x=${x}, y=${y}`);
+        
+        // 显示菜单并定位
+        contextMenu.style.display = 'block';
+        contextMenu.style.left = `${x}px`;
+        contextMenu.style.top = `${y}px`;
+    });
+    
+    // 阻止右键菜单自身的右键事件
+    contextMenu.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+    });
+    
+    // 点击其他区域隐藏菜单
+    document.addEventListener('mousedown', (e) => {
+        // 如果点击的不是菜单区域，隐藏菜单
+        if (!contextMenu.contains(e.target)) {
+            contextMenu.style.display = 'none';
+        }
+    });
+    
+    // 绑定菜单项点击事件
+    document.getElementById('create-file').addEventListener('click', (e) => {
+        console.log('点击新建文件');
+        e.stopPropagation(); // 阻止事件冒泡
+        
+        // 显示创建文件对话框
+        showModal(createFileModal);
+        fileNameInput.value = '';
+        fileNameInput.focus();
+        // 隐藏右键菜单
+        contextMenu.style.display = 'none';
+    });
+    
+    document.getElementById('create-folder').addEventListener('click', (e) => {
+        console.log('点击新建文件夹');
+        e.stopPropagation(); // 阻止事件冒泡
+        
+        // 显示创建文件夹对话框
+        showModal(createFolderModal);
+        folderNameInput.value = '';
+        folderNameInput.focus();
+        // 隐藏右键菜单
+        contextMenu.style.display = 'none';
+    });
+    
+    // 按下ESC键隐藏菜单
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            contextMenu.style.display = 'none';
+        }
+    });
+}
+
+// 设置对话框
+function setupModals() {
+    // 关闭按钮事件
+    document.querySelectorAll('.modal-close, .modal-close-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+            const modal = e.target.closest('.modal');
+            if (modal) {
+                hideModal(modal);
+            }
+        });
+    });
+    
+    // ESC键关闭对话框
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.modal').forEach(modal => {
+                hideModal(modal);
+            });
+        }
+    });
+    
+    // 创建文件按钮事件
+    document.getElementById('create-file-btn').addEventListener('click', () => {
+        const fileName = fileNameInput.value.trim();
+        if (fileName) {
+            // 执行touch命令创建文件
+            executeCommand('touch', [fileName]);
+            hideModal(createFileModal);
+            fileNameInput.value = '';
+        }
+    });
+    
+    // 创建文件夹按钮事件
+    document.getElementById('create-folder-btn').addEventListener('click', () => {
+        const folderName = folderNameInput.value.trim();
+        if (folderName) {
+            // 执行mkdir命令创建文件夹
+            executeCommand('mkdir', [folderName]);
+            hideModal(createFolderModal);
+            folderNameInput.value = '';
+        }
+    });
+    
+    // 回车键确认创建
+    fileNameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            document.getElementById('create-file-btn').click();
+        }
+    });
+    
+    folderNameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            document.getElementById('create-folder-btn').click();
+        }
+    });
+}
+
+// 显示对话框
+function showModal(modal) {
+    modal.style.display = 'flex';
+}
+
+// 隐藏对话框
+function hideModal(modal) {
+    modal.style.display = 'none';
+}
 
 // 刷新目录内容
 async function refreshDirectory() {
