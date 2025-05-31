@@ -1,0 +1,36 @@
+[package]
+name = "simulate_unixlike_fs"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+# 这里放的是一些项目依赖：
+[dependencies]
+
+# chrono 处理时间和日期的库，Rust 标准库不能处理日期和时间
+# 因此需要这个库来完成这个功能
+chrono = "0.4.19"
+
+# 用来在终端上显示彩色文本
+crossterm = "0.23.2"
+
+# Web框架
+actix-web = "4.3.1"
+actix-files = "0.6.2"
+actix-rt = "2.8.0"
+
+# 序列化/反序列化
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# 异步运行时
+tokio = { version = "1.28.0", features = ["full"] }
+
+# 日志
+env_logger = "0.10.0"
+log = "0.4.17"
+
+# 其他工具
+once_cell = "1.17.1"
+futures = "0.3.28"
