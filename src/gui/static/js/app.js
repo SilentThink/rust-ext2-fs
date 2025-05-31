@@ -10,6 +10,9 @@ const terminalContentElement = document.getElementById('terminal-content');
 const terminalInputElement = document.getElementById('terminal-input');
 const promptElement = document.getElementById('prompt');
 
+// 设置终端最大显示行数
+const MAX_TERMINAL_LINES = 100;
+
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
     // 获取当前目录内容
@@ -50,6 +53,9 @@ async function refreshDirectory() {
             const fileItem = createFileItem(item);
             fileListElement.appendChild(fileItem);
         });
+
+        // 滚动到文件列表顶部
+        fileListElement.scrollTop = 0;
     } catch (error) {
         console.error('获取目录内容失败:', error);
         appendToTerminal(`获取目录内容失败: ${error.message}`, 'error');
@@ -159,6 +165,12 @@ function handleTerminalInput(event) {
 // 执行命令
 async function executeCommand(cmd, args) {
     try {
+        // 处理清屏命令
+        if (cmd === 'clear') {
+            clearTerminal();
+            return;
+        }
+        
         // 特殊处理cd命令，因为它会改变当前目录
         if (cmd === 'cd') {
             const response = await fetch('/api/cd', {
@@ -207,10 +219,44 @@ async function executeCommand(cmd, args) {
 
 // 添加内容到终端
 function appendToTerminal(text, type) {
+    // 先检查是否需要清理旧内容
+    limitTerminalLines(true);
+    
     const line = document.createElement('div');
     line.className = `terminal-line ${type}`;
     line.textContent = text;
     
     terminalContentElement.appendChild(line);
+    
+    // 确保滚动到底部
+    scrollTerminalToBottom();
+}
+
+// 限制终端行数
+function limitTerminalLines(preCleanup = false) {
+    const lines = terminalContentElement.children;
+    // 如果是预清理，或者行数超过限制，进行清理
+    if (preCleanup && lines.length >= MAX_TERMINAL_LINES || lines.length > MAX_TERMINAL_LINES) {
+        // 计算需要移除的行数
+        const removeCount = lines.length - MAX_TERMINAL_LINES + (preCleanup ? 1 : 0);
+        
+        // 一次性移除多个元素
+        if (removeCount > 0) {
+            for (let i = 0; i < removeCount; i++) {
+                if (lines.length > 0) {
+                    terminalContentElement.removeChild(lines[0]);
+                }
+            }
+        }
+    }
+}
+
+// 清除终端内容
+function clearTerminal() {
+    terminalContentElement.innerHTML = '';
+}
+
+// 添加滚动到底部的函数
+function scrollTerminalToBottom() {
     terminalContentElement.scrollTop = terminalContentElement.scrollHeight;
 }
