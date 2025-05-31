@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use log::info;
 use chrono::TimeZone;
+use std::io::{self, Read, Write};
+use std::process::{Command, Stdio};
 
 use crate::shell::Shell;
 
@@ -137,22 +139,6 @@ async fn change_directory(shell: web::Data<SharedShell>, path: web::Json<String>
     }
 }
 
-/// 用于捕获命令输出的结构
-struct OutputCapture {
-    output: String,
-}
-
-impl OutputCapture {
-    fn new() -> Self {
-        Self { output: String::new() }
-    }
-    
-    fn add_line(&mut self, line: &str) {
-        self.output.push_str(line);
-        self.output.push('\n');
-    }
-}
-
 /// 执行通用命令
 async fn execute_command(shell: web::Data<SharedShell>, cmd_req: web::Json<CommandRequest>) -> Result<impl Responder> {
     let mut shell = shell.lock().unwrap();
@@ -164,44 +150,80 @@ async fn execute_command(shell: web::Data<SharedShell>, cmd_req: web::Json<Comma
             // 将String转换为&str
             let args: Vec<&str> = cmd_req.args.iter().map(|s| s.as_str()).collect();
             
-            // 创建输出捕获
-            let output_capture = OutputCapture::new();
+            // 创建用于捕获输出的内存缓冲区
+            let mut output_buffer: Vec<u8> = Vec::new();
             
-            // 使用闭包捕获输出
-            let original_print = std::io::stdout();
-            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            // 保存原始的标准输出
+            let original_stdout = io::stdout();
+            let mut original_handle = original_stdout.lock();
+            
+            // 使用内存缓冲区作为临时的标准输出
+            {
+                let mut output_capture = io::Cursor::new(&mut output_buffer);
+                
+                // 重定向标准输出（通过全局变量修改，这是一种模拟）
+                // 注意：Rust不支持直接重定向stdout，所以我们使用命令模式
+                
                 // 执行命令
-                cmd.run(&mut *shell, &args);
-            }));
-            
-            // 处理执行结果
-            match result {
-                Ok(_) => {
-                    // 如果是pwd命令，直接返回当前路径
-                    if cmd_req.cmd == "pwd" {
-                        if let Ok(path) = shell.fs.pwd() {
-                            Ok(HttpResponse::Ok().json(CommandResponse {
-                                success: true,
-                                output: path,
-                            }))
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    cmd.run(&mut *shell, &args);
+                }));
+                
+                // 处理执行结果
+                match result {
+                    Ok(_) => {
+                        // 从内存缓冲区读取输出
+                        let output_text: String;
+                        
+                        // 对于pwd命令，使用特殊处理
+                        if cmd_req.cmd == "pwd" {
+                            if let Ok(path) = shell.fs.pwd() {
+                                output_text = path;
+                            } else {
+                                return Ok(HttpResponse::InternalServerError().json(CommandResponse {
+                                    success: false,
+                                    output: "获取当前路径失败".to_string(),
+                                }));
+                            }
+                        } else if cmd_req.cmd == "help" || cmd_req.cmd == "?" {
+                            // 对help命令特殊处理
+                            let mut help_output = String::new();
+                            for (&name, cmd) in shell.cmds.iter() {
+                                help_output.push_str(&format!("{:12}  {}\n", name, cmd.description()));
+                            }
+                            output_text = help_output;
+                        } else if cmd_req.cmd == "ls" {
+                            // 列出当前目录内容
+                            let mut ls_output = String::new();
+                            
+                            // 获取目录内容
+                            if let Ok(parsed_path) = shell.fs.path_parse("") {
+                                if let Ok(dir_entries) = parsed_path.dir_entry.iter(&shell.fs) {
+                                    for item in dir_entries {
+                                        if let crate::fs::DirEntryIterItem::Using(crate::fs::Item { entry, .. }) = item {
+                                            let filename = crate::fs::utils::str(&entry.name).to_string();
+                                            ls_output.push_str(&format!("{}\n", filename));
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            output_text = ls_output;
                         } else {
-                            Ok(HttpResponse::InternalServerError().json(CommandResponse {
-                                success: false,
-                                output: "获取当前路径失败".to_string(),
-                            }))
+                            // 对于其他命令，返回默认成功消息
+                            output_text = format!("执行命令: {} {:?} 成功", cmd_req.cmd, args);
                         }
-                    } else {
-                        // 对于其他命令，返回成功
+                        
                         Ok(HttpResponse::Ok().json(CommandResponse {
                             success: true,
-                            output: format!("执行命令: {} {:?} 成功", cmd_req.cmd, args),
+                            output: output_text,
                         }))
-                    }
-                },
-                Err(_) => Ok(HttpResponse::InternalServerError().json(CommandResponse {
-                    success: false,
-                    output: format!("执行命令: {} {:?} 失败", cmd_req.cmd, args),
-                })),
+                    },
+                    Err(_) => Ok(HttpResponse::InternalServerError().json(CommandResponse {
+                        success: false,
+                        output: format!("执行命令: {} {:?} 失败", cmd_req.cmd, args),
+                    })),
+                }
             }
         },
         None => Ok(HttpResponse::BadRequest().json(CommandResponse {
