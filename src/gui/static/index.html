@@ -93,6 +93,46 @@
         </div>
     </div>
     
+    <!-- 文件内容查看对话框 -->
+    <div class="modal" id="file-content-modal">
+        <div class="modal-content file-content-modal-content">
+            <div class="modal-header">
+                <h3 id="file-content-title">文件内容</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <pre id="file-content-display" class="file-content-display"></pre>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary modal-close-btn">关闭</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 写入文件对话框 -->
+    <div class="modal" id="write-file-modal">
+        <div class="modal-content file-content-modal-content">
+            <div class="modal-header">
+                <h3 id="write-file-title">写入文件</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="write-file-name">文件名</label>
+                    <input type="text" class="form-control" id="write-file-name" placeholder="请输入文件名">
+                </div>
+                <div class="form-group" style="margin-top: 10px;">
+                    <label for="write-file-content">文件内容</label>
+                    <textarea id="write-file-content" class="form-control" rows="10" placeholder="请输入要写入的内容"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary modal-close-btn">取消</button>
+                <button class="btn btn-primary" id="write-file-btn">保存</button>
+            </div>
+        </div>
+    </div>
+    
     <script src="/js/app.js"></script>
 </body>
 </html>

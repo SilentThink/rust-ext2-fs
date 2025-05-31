@@ -14,8 +14,15 @@ const promptElement = document.getElementById('prompt');
 const contextMenu = document.getElementById('context-menu');
 const createFileModal = document.getElementById('create-file-modal');
 const createFolderModal = document.getElementById('create-folder-modal');
+const fileContentModal = document.getElementById('file-content-modal');
+const writeFileModal = document.getElementById('write-file-modal');
 const fileNameInput = document.getElementById('file-name');
 const folderNameInput = document.getElementById('folder-name');
+const fileContentDisplay = document.getElementById('file-content-display');
+const fileContentTitle = document.getElementById('file-content-title');
+const writeFileNameInput = document.getElementById('write-file-name');
+const writeFileContentInput = document.getElementById('write-file-content');
+const writeFileBtn = document.getElementById('write-file-btn');
 
 // 设置终端最大显示行数
 const MAX_TERMINAL_LINES = 100;
@@ -37,6 +44,40 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 设置对话框事件
     setupModals();
+    
+    // 设置写入文件按钮事件
+    writeFileBtn.addEventListener('click', () => {
+        const fileName = writeFileNameInput.value.trim();
+        const content = writeFileContentInput.value;
+        
+        if (fileName) {
+            // 调用write命令，传递文件名和内容
+            fetch('/api/command', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    cmd: 'write',
+                    args: [fileName, content]
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                appendToTerminal(data.output, data.success ? 'output' : 'error');
+                if (data.success) {
+                    hideModal(writeFileModal);
+                    refreshDirectory();
+                }
+            })
+            .catch(error => {
+                console.error('写入文件失败:', error);
+                appendToTerminal(`写入文件失败: ${error.message}`, 'error');
+            });
+        } else {
+            appendToTerminal('请指定文件名', 'error');
+        }
+    });
 });
 
 // 设置右键菜单
@@ -168,6 +209,20 @@ function setupModals() {
             document.getElementById('create-folder-btn').click();
         }
     });
+    
+    // 写入文件对话框回车键支持
+    writeFileNameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            writeFileContentInput.focus();
+        }
+    });
+    
+    writeFileContentInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && e.ctrlKey) {
+            writeFileBtn.click();
+            e.preventDefault();
+        }
+    });
 }
 
 // 显示对话框
@@ -255,8 +310,8 @@ function createFileItem(item) {
             const dirName = item.name === '..' ? '..' : item.name;
             executeCommand('cd', [dirName]);
         } else {
-            // 如果是文件，执行cat命令
-            executeCommand('cat', [item.name]);
+            // 如果是文件，显示文件内容
+            showFileContent(item.name);
         }
     });
     
@@ -325,6 +380,12 @@ async function executeCommand(cmd, args) {
             return;
         }
         
+        // 特殊处理write命令，显示写入文件对话框
+        if (cmd === 'write') {
+            showWriteFileDialog(args[0] || '');
+            return;
+        }
+        
         // 特殊处理cd命令，因为它会改变当前目录
         if (cmd === 'cd') {
             const response = await fetch('/api/cd', {
@@ -361,7 +422,7 @@ async function executeCommand(cmd, args) {
             appendToTerminal(data.output, data.success ? 'output' : 'error');
             
             // 如果命令可能改变了文件系统状态，刷新目录内容
-            if (['mkdir', 'touch', 'rm', 'rmdir', 'cp'].includes(cmd)) {
+            if (['mkdir', 'touch', 'rm', 'rmdir', 'cp', 'write'].includes(cmd)) {
                 refreshDirectory();
             }
         }
@@ -413,4 +474,83 @@ function clearTerminal() {
 // 添加滚动到底部的函数
 function scrollTerminalToBottom() {
     terminalContentElement.scrollTop = terminalContentElement.scrollHeight;
+}
+
+// 显示文件内容
+async function showFileContent(fileName) {
+    try {
+        // 设置对话框标题
+        fileContentTitle.textContent = `文件内容: ${fileName}`;
+        
+        // 清空内容显示区域
+        fileContentDisplay.textContent = '加载中...';
+        
+        // 显示对话框
+        showModal(fileContentModal);
+        
+        // 执行cat命令获取文件内容
+        const response = await fetch('/api/command', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                cmd: 'cat',
+                args: [fileName]
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // 显示文件内容
+            fileContentDisplay.textContent = data.output;
+        } else {
+            // 显示错误信息
+            fileContentDisplay.textContent = `无法读取文件: ${data.output}`;
+        }
+    } catch (error) {
+        console.error('获取文件内容失败:', error);
+        fileContentDisplay.textContent = `获取文件内容失败: ${error.message}`;
+    }
+}
+
+// 显示写入文件对话框
+function showWriteFileDialog(fileName = '') {
+    // 设置对话框标题和文件名
+    writeFileNameInput.value = fileName;
+    writeFileContentInput.value = '';
+    
+    // 如果指定了文件名且文件已存在，尝试读取内容
+    if (fileName) {
+        fetch('/api/command', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                cmd: 'cat',
+                args: [fileName]
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                writeFileContentInput.value = data.output;
+            }
+        })
+        .catch(error => {
+            console.error('读取文件内容失败:', error);
+        });
+    }
+    
+    // 显示对话框
+    showModal(writeFileModal);
+    
+    // 聚焦到文件名输入框，如果没有文件名
+    if (!fileName) {
+        writeFileNameInput.focus();
+    } else {
+        writeFileContentInput.focus();
+    }
 }
