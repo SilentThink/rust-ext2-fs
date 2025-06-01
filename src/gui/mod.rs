@@ -202,6 +202,7 @@ async fn execute_command(shell: web::Data<SharedShell>, cmd_req: web::Json<Comma
                 // 对cat命令特殊处理，直接读取文件内容
                 handled = true;
                 let mut cat_output = String::new();
+                let mut has_any_error = false;
                 
                 for arg in &args {
                     match shell.fs.open(arg) {
@@ -222,6 +223,7 @@ async fn execute_command(shell: web::Data<SharedShell>, cmd_req: web::Json<Comma
                                     Err(e) => {
                                         cat_output.push_str(&format!("{}: {}\n", arg, e));
                                         has_error = true;
+                                        has_any_error = true;
                                         break;
                                     }
                                 }
@@ -233,11 +235,15 @@ async fn execute_command(shell: web::Data<SharedShell>, cmd_req: web::Json<Comma
                             
                             shell.fs.close(fd).unwrap_or_default();
                         }
-                        Err(e) => cat_output.push_str(&format!("{}: {}\n", arg, e)),
+                        Err(e) => {
+                            cat_output.push_str(&format!("{}: {}\n", arg, e));
+                            has_any_error = true;
+                        }
                     }
                 }
                 
                 output_text = cat_output;
+                success = !has_any_error;
             } else if cmd_req.cmd == "whoami" {
                 // 获取当前用户
                 handled = true;
@@ -380,8 +386,8 @@ async fn execute_command(shell: web::Data<SharedShell>, cmd_req: web::Json<Comma
                 let _ = std::fs::remove_file(temp_file_path);
             }
             
-            // 如果输出为空，但命令执行成功，添加成功消息
-            if output_text.trim().is_empty() && success {
+            // 如果输出为空，但命令执行成功，添加成功消息（cat命令除外，因为空文件应该返回空内容）
+            if output_text.trim().is_empty() && success && cmd_req.cmd != "cat" {
                 output_text = format!("命令 {} 执行成功", cmd_req.cmd);
             }
             

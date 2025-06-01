@@ -10,6 +10,9 @@ const terminalContentElement = document.getElementById('terminal-content');
 const terminalInputElement = document.getElementById('terminal-input');
 const promptElement = document.getElementById('prompt');
 
+// 当前查看的文件名
+let currentViewingFile = '';
+
 // 右键菜单和对话框元素
 const contextMenu = document.getElementById('context-menu');
 const createFileModal = document.getElementById('create-file-modal');
@@ -221,6 +224,16 @@ function setupModals() {
         if (e.key === 'Enter' && e.ctrlKey) {
             writeFileBtn.click();
             e.preventDefault();
+        }
+    });
+    
+    // 编辑文件按钮事件
+    document.getElementById('edit-file-btn').addEventListener('click', () => {
+        if (currentViewingFile) {
+            // 隐藏文件内容查看对话框
+            hideModal(fileContentModal);
+            // 显示写入文件对话框进行编辑
+            showWriteFileDialog(currentViewingFile);
         }
     });
 }
@@ -479,6 +492,9 @@ function scrollTerminalToBottom() {
 // 显示文件内容
 async function showFileContent(fileName) {
     try {
+        // 保存当前查看的文件名
+        currentViewingFile = fileName;
+        
         // 设置对话框标题
         fileContentTitle.textContent = `文件内容: ${fileName}`;
         
