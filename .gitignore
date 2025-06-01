@@ -1,2 +1,5 @@
 /target
 *.txt
+.trae
+Cargo.lock
+disk.bin
