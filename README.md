@@ -203,7 +203,7 @@ cargo doc --no-deps --document-private-items --release --open
 ```
 
 ## todo
-- [ ] 实现rmdir对非空文件夹的递归删除
+- [x] 实现rmdir对非空文件夹的递归删除
 - [ ] 实现fs对硬链接的支持,并添加对应的shell命令
 - [ ] 实现fs对软链接的支持,并添加对应的shell命令
 - [ ] 在gui界面添加快捷方式的创建功能

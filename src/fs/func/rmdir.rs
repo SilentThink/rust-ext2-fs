@@ -4,12 +4,22 @@ use crate::fs::core::*;
 impl Fs {
     // 删除当前目录下的空文件夹 `dir_name`
     pub fn rmdir(&mut self, path: &str) -> Result<()> {
+        self.rmdir_internal(path, false)
+    }
+
+    // 递归删除目录（包括非空目录）
+    pub fn rmdir_recursive(&mut self, path: &str) -> Result<()> {
+        self.rmdir_internal(path, true)
+    }
+
+    // 内部实现，支持递归删除
+    fn rmdir_internal(&mut self, path: &str, recursive: bool) -> Result<()> {
         // 寻找要删除的文件夹
         let item_to_delete = self.path_parse(path)?;
-        let mut dir_entry = item_to_delete.dir_entry.clone();
+        let dir_entry = item_to_delete.dir_entry.clone();
         let dir_name = str(&dir_entry.name);
 
-        let mut inode = Inode::from_disk(&self.disk, self.addr_i_node(dir_entry.i_node))?;
+        let inode = Inode::from_disk(&self.disk, self.addr_i_node(dir_entry.i_node))?;
 
         // rm 需要对目录的写权限
         if !inode.i_mode.can_write(self.user) {
@@ -37,14 +47,73 @@ impl Fs {
             ));
         }
 
-        if inode.i_size as usize != 2 * DIR_ENTRY_SIZE {
+        // 检查目录是否为空（只包含 . 和 ..）
+        let is_empty = inode.i_size as usize == 2 * DIR_ENTRY_SIZE;
+        
+        if !is_empty && !recursive {
             return Err(Error::new(
                 ErrorKind::Other,
                 "Directory is not empty",
             ));
         }
 
-        // 是空目录
+        // 如果是递归删除且目录不为空，先删除目录中的所有内容
+        if !is_empty && recursive {
+            self.clear_directory_contents(&dir_entry)?;
+        }
+
+        // 删除空目录
+        self.delete_empty_directory(item_to_delete)
+    }
+
+    // 清空目录中的所有内容（递归删除子目录和文件）
+    fn clear_directory_contents(&mut self, dir_entry: &DirEntry) -> Result<()> {
+        // 保存当前工作目录
+        let original_cwd = self.cwd.clone();
+        
+        // 切换到要清空的目录
+        self.cwd = dir_entry.clone();
+
+        // 收集所有需要删除的项目（避免在迭代时修改）
+        let mut items_to_delete = Vec::new();
+        
+        for entry_item in dir_entry.iter_without_limit(self)? {
+            if let iter::DirEntryIterItem::Using(item) = entry_item {
+                let entry_name = str(&item.entry.name);
+                // 跳过 "." 和 ".."
+                if entry_name != "." && entry_name != ".." {
+                    items_to_delete.push(item);
+                }
+            }
+        }
+
+        // 删除收集到的所有项目
+        for item in items_to_delete {
+            let entry_name = str(&item.entry.name);
+            match item.entry.file_type.into() {
+                FileType::Dir => {
+                    // 递归删除子目录
+                    self.rmdir_recursive(&entry_name)?;
+                }
+                FileType::File => {
+                    // 删除文件
+                    let fd = self.open(&entry_name)?;
+                    self.rm(fd)?;
+                }
+            }
+        }
+
+        // 恢复原来的工作目录
+        self.cwd = original_cwd;
+        
+        Ok(())
+    }
+
+    // 删除空目录的具体实现
+    fn delete_empty_directory(&mut self, item_to_delete: PathParseRes) -> Result<()> {
+        let mut dir_entry = item_to_delete.dir_entry.clone();
+        let mut inode = Inode::from_disk(&self.disk, self.addr_i_node(dir_entry.i_node))?;
+
         // 删除所有数据块
         inode.free_data_block(0, self)?;
 
