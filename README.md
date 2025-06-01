@@ -217,6 +217,16 @@ cargo doc --no-deps --document-private-items --release --open
 📦 storage: 改进磁盘空间回收机制
 ```
 
+## todo
+- [ ] 实现rmdir对非空文件夹的递归删除
+- [ ] 实现fs对硬链接的支持,并添加对应的shell命令
+- [ ] 实现fs对软链接的支持,并添加对应的shell命令
+- [ ] 在gui界面添加快捷方式的创建功能
+- [ ] 实现fs对文件的压缩/解压缩功能,并添加对应的shell命令
+- [ ] 实现mv命令
+- [ ] shell实现记录历史命令,上下方向键浏览历史命令
+- [ ] shell实现tab键自动补全功能
+
 ## 使用指南
 
 ### 启动系统
