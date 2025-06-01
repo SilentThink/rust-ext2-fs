@@ -6,8 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use log::info;
 use chrono::TimeZone;
-use std::io::{self, Read, Write};
-use std::process::{Command, Stdio};
+use std::io::{self, Write};
 
 use crate::shell::Shell;
 
@@ -331,10 +330,6 @@ async fn execute_command(shell: web::Data<SharedShell>, cmd_req: web::Json<Comma
                 // 创建临时文件以捕获输出
                 let temp_dir = std::env::temp_dir();
                 let temp_file_path = temp_dir.join(format!("ext2fs_cmd_output_{}.txt", std::process::id()));
-                
-                // 重定向标准输出到临时文件
-                let original_stdout = std::io::stdout();
-                let mut original_handle = original_stdout.lock();
                 
                 // 创建临时文件
                 let file = match std::fs::File::create(&temp_file_path) {

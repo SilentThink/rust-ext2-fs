@@ -1,7 +1,6 @@
 pub mod cmd;
 
 use std::io::Write;
-use std::sync::Arc;
 
 use self::cmd::Cmds;
 use super::fs::Fs;

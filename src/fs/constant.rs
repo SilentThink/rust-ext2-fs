@@ -10,8 +10,14 @@ pub const BLOCK_SIZE: usize = 512;
 /// 数据块的块数为 BLOCK_SIZE * 8
 pub const DATA_BLOCKS: usize = BLOCK_SIZE * 8;
 
+/// 文件系统支持的最大文件数
+const MAX_FILES: usize = DATA_BLOCKS; // 假设每个数据块可以存储一个文件
+
+/// 每个块可以存储的 Inode 数量
+const INODES_PER_BLOCK: usize = BLOCK_SIZE / size_of::<Inode>();
+
 /// i 节点需要的块数
-const INODE_BLOCKS: usize = 8 * size_of::<Inode>();
+const INODE_BLOCKS: usize = (MAX_FILES + INODES_PER_BLOCK - 1) / INODES_PER_BLOCK;
 
 /// 数据块在磁盘上的起始位置。
 /// 前三块被用来存储 位图 和 组描述符 [`GroupDesc`](crate::fs::GroupDesc)，
