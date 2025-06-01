@@ -132,24 +132,6 @@ src
 - **清屏功能**：使用`clear`命令可以清空终端内容
 - **历史命令**：使用上下方向键浏览历史命令
 
-### GUI代码结构
-
-```
-src
-├── gui
-│  ├── mod.rs       // Web服务器实现，处理API请求
-│  └── static       // 静态资源
-│     ├── css       // 样式文件
-│     ├── js        // JavaScript代码
-│     └── index.html // Web界面入口
-```
-
-### API接口
-
-- `/api/directory` - 获取当前目录内容
-- `/api/cd` - 更改当前目录
-- `/api/command` - 执行Shell命令
-
 ### 浏览器兼容性
 
 Web界面已在以下浏览器测试通过：
@@ -207,7 +189,7 @@ cargo doc --no-deps --document-private-items --release --open
 ```
 ✨ feat(shell): 添加cat命令支持显示二进制文件
 🐛 fix(fs): 修复大文件写入时的内存泄漏问题
-📝 docs: 更新文件系统API文档
+📝 docs: 更新README文档
 💄 style: 统一代码缩进风格
 ♻️ refactor(core): 重构inode管理逻辑
 ⚡️ perf(fs): 优化目录项查找算法，提高文件访问速度
