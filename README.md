@@ -4,6 +4,8 @@
 
 支持用户添加/删除，文件读写，权限控制等功能。提供终端Shell界面和基于Web的可视化图形界面，方便用户直观操作文件系统。
 
+![](README_Asset/PixPin_2025-06-01_13-40-21.png)
+
 ## 代码结构
 
 ```
@@ -85,7 +87,7 @@ src
   ```
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
   ```
-  
+
   - Windows
 
   [安装 Rustup](https://forge.rust-lang.org/infra/other-installation-methods.html#other-ways-to-install-rustup)
