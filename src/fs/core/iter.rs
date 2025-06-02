@@ -108,5 +108,5 @@ fn test_iter() {
             );
         }
     }
-    assert_eq!(i, 6);
+    assert_eq!(i, 8);
 }

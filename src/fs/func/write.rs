@@ -59,35 +59,7 @@ impl Fs {
 
 #[test]
 fn test_read_write() {
-    let part1 = r#"fn main() {
-    println!("Hello World");
-}
-
-// This is simple Hello World program in Rust
-// You can use `cargo new` to create rust project.
-
-// So, seems this functions works properly........
-// Seems great.
-
-fn main() {
-    println!("Hello World");
-}
-
-// This is simple Hello World program in Rust
-// You can use `cargo new` to create rust project.
-
-// So, seems this functions works properly........
-// Seems great.
-fn main() {
-    println!("Hello World");
-}
-
-// This is simple Hello World program in Rust
-// You can use `cargo new` to create rust project.
-
-// So, seems this functions works properly........
-// Seems great.
-"#;
+    let part1 = r#"ghjgky;;...fygeyrgfierwygw"#;
 
     let mut fs = Fs::format().unwrap();
     fs.create("test.txt").unwrap();
