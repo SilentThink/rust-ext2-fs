@@ -50,6 +50,7 @@ impl Fs {
             i_ctime: now,
             i_mtime: now,
             i_block: Default::default(),
+            i_links_count: 1,
         };
         disk.write_at(
             (&inode).bytes(),

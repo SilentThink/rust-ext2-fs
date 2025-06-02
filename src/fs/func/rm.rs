@@ -45,14 +45,41 @@ impl Fs {
             return Err(Error::new(ErrorKind::Other, "Bad file description"));
         }
 
-        let file = self.fds[fd].clone().unwrap();
+        let mut file = self.fds[fd].clone().unwrap();
 
         // rm 需要对目录的写权限
         if !file.inode.i_mode.can_write(self.user) {
             return Err(Error::new(ErrorKind::PermissionDenied, "Permission Denied"));
         }
 
-        // 清空文件存储的数据块
+        // 减少硬链接计数
+        file.inode.i_links_count -= 1;
+        
+        // 如果还有其他硬链接引用，只更新inode并删除当前目录项
+        if file.inode.i_links_count > 0 {
+            // 更新inode
+            self.write_inode(file.inode_i, file.inode)?;
+            
+            // 删除当前目录项
+            let mut dir_entry = DirEntry::from_disk(&self.disk, file.dir_entry_addr)?;
+            dir_entry.i_node = 0;
+            dir_entry.rec_len = 1;
+            self.disk.write_at(dir_entry.bytes(), file.dir_entry_addr)?;
+            
+            // 更新父目录inode
+            let mut cwd_inode = Inode::from_disk(&self.disk, self.addr_i_node(file.parent_inode_i))?;
+            cwd_inode.i_size -= DIR_ENTRY_SIZE as u32;
+            cwd_inode.i_mtime = utils::now();
+            self.write_inode(file.parent_inode_i, cwd_inode)?;
+            
+            // 回收文件描述符
+            self.fds[fd] = None;
+            self.opened_len -= 1;
+            
+            return Ok(());
+        }
+
+        // 如果没有其他硬链接引用，清空文件存储的数据块
         self.cut(fd, 0)?;
 
         // 删除文件的索引节点
@@ -106,5 +133,5 @@ fn test_rm_file() {
         }
     }
 
-    assert_eq!(len, 5);
+    assert_eq!(len, 7);
 }

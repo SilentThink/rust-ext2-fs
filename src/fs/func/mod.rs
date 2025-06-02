@@ -17,3 +17,4 @@ mod userdel;
 mod write;
 mod chmod;
 mod chown;
+mod link;

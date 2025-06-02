@@ -33,6 +33,8 @@ pub struct Inode {
     pub i_ctime: u32,
     /// 修改时间
     pub i_mtime: u32,
+    /// 硬链接数量（引用计数）
+    pub i_links_count: u16,
     /// 指向数据块的指针数组（使用二级索引）
     pub(in crate::fs) i_block: [u16; 8],
 }
@@ -47,6 +49,7 @@ impl Default for Inode {
             i_block: Default::default(),
             i_ctime: now,
             i_mtime: now,
+            i_links_count: 1, // 默认为1个引用（创建时）
         }
     }
 }

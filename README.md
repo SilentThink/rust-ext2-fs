@@ -204,7 +204,7 @@ cargo doc --no-deps --document-private-items --release --open
 
 ## todo
 - [x] 实现rmdir对非空文件夹的递归删除
-- [ ] 实现fs对硬链接的支持,并添加对应的shell命令
+- [x] 实现fs对硬链接的支持,并添加对应的shell命令
 - [ ] 实现fs对软链接的支持,并添加对应的shell命令
 - [ ] 在gui界面添加快捷方式的创建功能
 - [ ] 实现fs对文件的压缩/解压缩功能,并添加对应的shell命令
@@ -273,6 +273,7 @@ cargo doc --no-deps --document-private-items --release --open
 | `write` | 写入文件内容 | `write file.txt` |
 | `rm` | 删除文件 | `rm file.txt` |
 | `rmdir` | 删除空文件夹 | `rmdir docs` |
+| `ln` | 创建硬链接 | `ln target link_name` |
 | `useradd` | 添加用户 | `useradd username password` |
 | `userdel` | 删除用户 | `userdel username` |
 | `login` | 切换用户 | `login username` |
