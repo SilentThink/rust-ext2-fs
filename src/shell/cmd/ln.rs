@@ -1,5 +1,4 @@
 use super::Cmd;
-use crate::fs::core::*;
 
 pub struct Ln;
 
