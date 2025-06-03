@@ -120,6 +120,44 @@ header h1 {
     color: #3498db;
 }
 
+.file-icon.symlink {
+    color: #9b59b6;
+    position: relative;
+}
+
+.file-icon.symlink::after {
+    content: '\f0c1';
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    font-size: 0.6em;
+    color: #e74c3c;
+    background: white;
+    border-radius: 50%;
+    padding: 1px;
+}
+
+.file-icon.symlink-dir {
+    color: #f39c12;
+    position: relative;
+}
+
+.file-icon.symlink-dir::after {
+    content: '\f0c1';
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    font-size: 0.6em;
+    color: #e74c3c;
+    background: white;
+    border-radius: 50%;
+    padding: 1px;
+}
+
 .file-name {
     flex: 1;
 }

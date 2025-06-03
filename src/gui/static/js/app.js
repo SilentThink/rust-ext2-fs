@@ -15,17 +15,24 @@ let currentViewingFile = '';
 
 // 右键菜单和对话框元素
 const contextMenu = document.getElementById('context-menu');
+const fileContextMenu = document.getElementById('file-context-menu');
 const createFileModal = document.getElementById('create-file-modal');
 const createFolderModal = document.getElementById('create-folder-modal');
+const createShortcutModal = document.getElementById('create-shortcut-modal');
 const fileContentModal = document.getElementById('file-content-modal');
 const writeFileModal = document.getElementById('write-file-modal');
 const fileNameInput = document.getElementById('file-name');
 const folderNameInput = document.getElementById('folder-name');
+const shortcutTargetInput = document.getElementById('shortcut-target');
+const shortcutNameInput = document.getElementById('shortcut-name');
 const fileContentDisplay = document.getElementById('file-content-display');
 const fileContentTitle = document.getElementById('file-content-title');
 const writeFileNameInput = document.getElementById('write-file-name');
 const writeFileContentInput = document.getElementById('write-file-content');
 const writeFileBtn = document.getElementById('write-file-btn');
+
+// 当前右键点击的文件信息
+let currentRightClickedItem = null;
 
 // 设置终端最大显示行数
 const MAX_TERMINAL_LINES = 100;
@@ -119,8 +126,9 @@ function setupContextMenu() {
     // 点击其他区域隐藏菜单
     document.addEventListener('mousedown', (e) => {
         // 如果点击的不是菜单区域，隐藏菜单
-        if (!contextMenu.contains(e.target)) {
+        if (!contextMenu.contains(e.target) && !fileContextMenu.contains(e.target)) {
             contextMenu.style.display = 'none';
+            fileContextMenu.style.display = 'none';
         }
     });
     
@@ -149,10 +157,28 @@ function setupContextMenu() {
         contextMenu.style.display = 'none';
     });
     
+    // 绑定创建快捷方式菜单项点击事件
+    document.getElementById('create-shortcut').addEventListener('click', (e) => {
+        console.log('点击创建快捷方式');
+        e.stopPropagation();
+        
+        if (currentRightClickedItem) {
+            // 显示创建快捷方式对话框
+            shortcutTargetInput.value = currentRightClickedItem.name;
+            shortcutNameInput.value = currentRightClickedItem.name + '_shortcut';
+            showModal(createShortcutModal);
+            shortcutNameInput.focus();
+        }
+        
+        // 隐藏右键菜单
+        fileContextMenu.style.display = 'none';
+    });
+    
     // 按下ESC键隐藏菜单
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             contextMenu.style.display = 'none';
+            fileContextMenu.style.display = 'none';
         }
     });
 }
@@ -236,6 +262,27 @@ function setupModals() {
             showWriteFileDialog(currentViewingFile);
         }
     });
+    
+    // 创建快捷方式按钮事件
+    document.getElementById('create-shortcut-btn').addEventListener('click', () => {
+        const target = shortcutTargetInput.value.trim();
+        const shortcutName = shortcutNameInput.value.trim();
+        
+        if (target && shortcutName) {
+            // 执行ln -s命令创建软链接
+            executeCommand('ln', ['-s', target, shortcutName]);
+            hideModal(createShortcutModal);
+            shortcutTargetInput.value = '';
+            shortcutNameInput.value = '';
+        }
+    });
+    
+    // 快捷方式名称输入框回车键支持
+    shortcutNameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            document.getElementById('create-shortcut-btn').click();
+        }
+    });
 }
 
 // 显示对话框
@@ -290,8 +337,19 @@ function createFileItem(item) {
     fileItem.className = 'file-item';
     
     const icon = document.createElement('span');
-    icon.className = `file-icon ${item.is_dir ? 'folder' : 'file'}`;
-    icon.innerHTML = item.is_dir ? '<i class="fas fa-folder"></i>' : '<i class="fas fa-file"></i>';
+    // 根据文件类型设置图标样式
+    if (item.is_symlink) {
+        if (item.is_dir) {
+            icon.className = 'file-icon symlink-dir';
+            icon.innerHTML = '<i class="fas fa-folder"></i>';
+        } else {
+            icon.className = 'file-icon symlink';
+            icon.innerHTML = '<i class="fas fa-file"></i>';
+        }
+    } else {
+        icon.className = `file-icon ${item.is_dir ? 'folder' : 'file'}`;
+        icon.innerHTML = item.is_dir ? '<i class="fas fa-folder"></i>' : '<i class="fas fa-file"></i>';
+    }
     
     const name = document.createElement('span');
     name.className = 'file-name';
@@ -316,9 +374,44 @@ function createFileItem(item) {
     fileItem.appendChild(name);
     fileItem.appendChild(details);
     
+    // 添加右键菜单事件
+    fileItem.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // 跳过返回上级目录项
+        if (item.name === '..') {
+            return;
+        }
+        
+        // 保存当前右键点击的文件信息
+        currentRightClickedItem = item;
+        
+        // 获取鼠标位置
+        const x = e.clientX || e.pageX;
+        const y = e.clientY || e.pageY;
+        
+        // 显示文件右键菜单
+        fileContextMenu.style.display = 'block';
+        fileContextMenu.style.left = `${x}px`;
+        fileContextMenu.style.top = `${y}px`;
+        
+        // 隐藏普通右键菜单
+        contextMenu.style.display = 'none';
+    });
+    
     // 添加双击事件
     fileItem.addEventListener('dblclick', () => {
-        if (item.is_dir) {
+        if (item.is_symlink) {
+            // 如果是软链接，根据目标类型处理
+            if (item.is_dir) {
+                // 软链接指向目录，执行cd命令
+                executeCommand('cd', [item.name]);
+            } else {
+                // 软链接指向文件，显示文件内容
+                showFileContent(item.name);
+            }
+        } else if (item.is_dir) {
             // 如果是目录，执行cd命令
             const dirName = item.name === '..' ? '..' : item.name;
             executeCommand('cd', [dirName]);
@@ -435,7 +528,7 @@ async function executeCommand(cmd, args) {
             appendToTerminal(data.output, data.success ? 'output' : 'error');
             
             // 如果命令可能改变了文件系统状态，刷新目录内容
-            if (['mkdir', 'touch', 'rm', 'rmdir', 'cp', 'write'].includes(cmd)) {
+            if (['mkdir', 'touch', 'rm', 'rmdir', 'cp', 'write', 'ln'].includes(cmd)) {
                 refreshDirectory();
             }
         }

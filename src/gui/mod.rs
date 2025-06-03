@@ -18,6 +18,7 @@ type SharedShell = Arc<Mutex<Shell>>;
 pub struct FileItem {
     name: String,
     is_dir: bool,
+    is_symlink: bool,
     size: String,
     owner: String,
     mode: String,
@@ -72,16 +73,36 @@ async fn get_current_directory(shell: web::Data<SharedShell>) -> Result<impl Res
                         continue;
                     }
                     
-                    let is_dir = match entry.file_type.into() {
-                        crate::fs::FileType::Dir => true,
-                        crate::fs::FileType::File => false,
-                        crate::fs::FileType::Symlink => false,
-                    };
+                    let file_type: crate::fs::FileType = entry.file_type.into();
+                    let is_symlink = matches!(file_type, crate::fs::FileType::Symlink);
+                    
+                    let mut is_dir = matches!(file_type, crate::fs::FileType::Dir);
+                    
+                    // 如果是软链接，需要检查目标类型
+                    if is_symlink {
+                        // 尝试解析软链接目标
+                        let full_path = if path == "/" {
+                            format!("/{}", filename)
+                        } else {
+                            format!("{}/{}", path, filename)
+                        };
+                        
+                        if let Ok(target_res) = shell.fs.path_parse_with_options(&full_path, true) {
+                            let target_type: crate::fs::FileType = target_res.dir_entry.file_type.into();
+                            is_dir = matches!(target_type, crate::fs::FileType::Dir);
+                        }
+                    }
                     
                     // 获取inode信息
                     if let Ok(i_node) = shell.fs.get_inode(entry.i_node) {
-                        let file_type = if is_dir { "d" } else { "f" };
-                        let mode = format!("[{}].{}", file_type, i_node.i_mode);
+                        let file_type_char = if is_symlink {
+                            "l"
+                        } else if is_dir {
+                            "d"
+                        } else {
+                            "f"
+                        };
+                        let mode = format!("[{}].{}", file_type_char, i_node.i_mode);
                         
                         let owner = users
                             .get(i_node.i_mode.owner as usize)
@@ -97,6 +118,7 @@ async fn get_current_directory(shell: web::Data<SharedShell>) -> Result<impl Res
                         items.push(FileItem {
                             name: filename,
                             is_dir,
+                            is_symlink,
                             size,
                             owner,
                             mode,
