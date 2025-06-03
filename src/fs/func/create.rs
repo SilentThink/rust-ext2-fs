@@ -98,6 +98,14 @@ impl Fs {
 
                 inode
             }
+            FileType::Symlink => {
+                // 软链接的创建在symlink.rs中单独实现
+                // 这里不应该被调用
+                return Err(Error::new(
+                    ErrorKind::Other,
+                    "Symlinks should be created using symlink() function",
+                ));
+            }
         };
 
         // 保存索引节点

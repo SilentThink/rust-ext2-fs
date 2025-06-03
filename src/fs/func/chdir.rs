@@ -14,8 +14,19 @@ impl Fs {
         }
 
         match entry.file_type.into() {
-            FileType::File => Err(Error::new(ErrorKind::Other, "Not a directory")),
+            FileType::File => {
+                return Err(Error::new(
+                    ErrorKind::Other,
+                    format!("{}: Not a directory", utils::str(&entry.name)),
+                ))
+            }
             FileType::Dir => {
+                self.cwd = entry;
+                Ok(())
+            }
+            FileType::Symlink => {
+                // 对于软链接，我们需要解析目标路径
+                // 但path_parse已经处理了软链接的解析，所以这里不需要额外操作
                 self.cwd = entry;
                 Ok(())
             }
@@ -25,8 +36,19 @@ impl Fs {
     pub (in crate::fs) fn chdir_without_limit(&mut self, path: &str) -> Result<()> {
         let entry = self.path_parse(path)?.dir_entry;
         match entry.file_type.into() {
-            FileType::File => Err(Error::new(ErrorKind::Other, "Not a directory")),
+            FileType::File => {
+                return Err(Error::new(
+                    ErrorKind::Other,
+                    format!("{}: Not a directory", utils::str(&entry.name)),
+                ))
+            }
             FileType::Dir => {
+                self.cwd = entry;
+                Ok(())
+            }
+            FileType::Symlink => {
+                // 对于软链接，我们需要解析目标路径
+                // 但path_parse已经处理了软链接的解析，所以这里不需要额外操作
                 self.cwd = entry;
                 Ok(())
             }

@@ -91,12 +91,17 @@ impl Fs {
         for item in items_to_delete {
             let entry_name = str(&item.entry.name);
             match item.entry.file_type.into() {
+                FileType::File => {
+                    // 递归删除文件
+                    let fd = self.open(&entry_name)?;
+                    self.rm(fd)?;
+                }
                 FileType::Dir => {
-                    // 递归删除子目录
+                    // 递归删除目录
                     self.rmdir_recursive(&entry_name)?;
                 }
-                FileType::File => {
-                    // 删除文件
+                FileType::Symlink => {
+                    // 删除软链接
                     let fd = self.open(&entry_name)?;
                     self.rm(fd)?;
                 }

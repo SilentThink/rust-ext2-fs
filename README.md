@@ -205,7 +205,7 @@ cargo doc --no-deps --document-private-items --release --open
 ## todo
 - [x] 实现rmdir对非空文件夹的递归删除
 - [x] 实现fs对硬链接的支持,并添加对应的shell命令
-- [ ] 实现fs对软链接的支持,并添加对应的shell命令
+- [x] 实现fs对软链接的支持,并添加对应的shell命令
 - [ ] 在gui界面添加快捷方式的创建功能
 - [ ] 实现fs对文件的压缩/解压缩功能,并添加对应的shell命令
 - [ ] 实现mv命令
@@ -213,7 +213,6 @@ cargo doc --no-deps --document-private-items --release --open
 - [x] web shell实现记录历史命令,上下方向键浏览历史命令
 - [ ] shell实现tab键自动补全功能
 - [x] GUI界面支持文件内容编辑功能
-- [x] 修复空文件在GUI中显示"命令 cat 执行成功"的问题
 
 ## 使用指南
 
@@ -274,12 +273,14 @@ cargo doc --no-deps --document-private-items --release --open
 | `rm` | 删除文件 | `rm file.txt` |
 | `rmdir` | 删除空文件夹 | `rmdir docs` |
 | `ln` | 创建硬链接 | `ln target link_name` |
+| `ln -s` | 创建软链接 | `ln -s target link_name` |
 | `useradd` | 添加用户 | `useradd username password` |
 | `userdel` | 删除用户 | `userdel username` |
 | `login` | 切换用户 | `login username` |
 | `whoami` | 显示当前用户 | `whoami` |
 | `chmod` | 修改文件权限 | `chmod rwx:r-- file.txt` |
 | `chown` | 修改文件所有者 | `chown username file.txt` |
+
 
 ### 用户和权限管理
 

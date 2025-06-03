@@ -60,27 +60,66 @@ impl Cmd for Rm {
     }
 
     fn run(&self, crate::shell::Shell { fs, .. }: &mut crate::shell::Shell, argv: &[&str]) {
-        let dir = fs.pwd().unwrap();
+        let dir = fs.pwd();
 
         if argv.len() == 0 {
             return;
         }
 
-        if argv[0] == "-r" {
-            if argv.len() >= 2 {
-                for &arg in &argv[1..] {
-                    Self::rm_recursively(fs, &format!("{}/{}", dir, arg));
-                }
+        // 检查是否有-r选项（递归删除）
+        let mut recursive = false;
+        // 检查是否有-L选项（跟随链接）
+        let mut follow_links = false;
+        let mut args = Vec::new();
+        
+        for &arg in argv {
+            if arg == "-L" {
+                follow_links = true;
+            } else if arg == "-r" {
+                recursive = true;
+            } else if arg == "-h" {
+                println!("{}", self.help());
                 return;
+            } else {
+                args.push(arg);
             }
         }
 
-        if argv[0] == "-h" {
-            println!("{}", self.help());
+        // 如果没有指定文件参数，显示帮助
+        if args.is_empty() {
+            println!("Usage: rm [-r] [-L] <file>...");
             return;
         }
 
-        for arg in argv {
+        // 处理递归删除
+        if recursive {
+            for arg in args {
+                Self::rm_recursively(fs, &format!("{}/{}", dir, arg));
+            }
+            return;
+        }
+
+        // 处理普通删除
+        for arg in args {
+            // 首先尝试检查是否为符号链接
+            if !follow_links {
+                // 尝试删除符号链接本身
+                match fs.path_parse_with_options(arg, false) {
+                    Ok(path_res) => {
+                        let symlink_type: u8 = FileType::Symlink.into();
+                        if path_res.dir_entry.file_type == symlink_type {
+                            // 是符号链接，删除链接本身
+                            if let Err(e) = fs.rm_symlink(arg) {
+                                println!("{}: {}", arg, e);
+                            }
+                            continue;
+                        }
+                    },
+                    Err(_) => {}
+                }
+            }
+            
+            // 不是符号链接或者指定了-L选项，使用常规删除流程
             let mut err = None;
             match fs.open(arg) {
                 Ok(fd) => {
@@ -107,6 +146,7 @@ impl Cmd for Rm {
         self.description()
             + r#"
  -h show this message
- -r delete files recursively"#
+ -r delete files recursively
+ -L follow symbolic links (delete the target instead of the link)"#
     }
 }

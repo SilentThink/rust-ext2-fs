@@ -34,15 +34,17 @@ impl Ls {
                 match entry.file_type.into() {
                     FileType::Dir => filename = filename.blue().to_string(),
                     FileType::File => filename = filename.green().to_string(),
+                    FileType::Symlink => filename = filename.yellow().to_string(),
                 }
                 file_w = file_w.max(filename.len());
 
                 let i_node = fs.get_inode(entry.i_node)?;
                 let file_type = match entry.file_type.into() {
-                    FileType::File => "f",
                     FileType::Dir => "d",
+                    FileType::File => "-",
+                    FileType::Symlink => "l",
                 };
-                let mode = format!("[{}].{}", file_type, i_node.i_mode);
+                let mode = format!("{}{}", file_type, i_node.i_mode);
                 mode_w = mode_w.max(mode.len());
 
                 let owner = users
@@ -59,7 +61,28 @@ impl Ls {
                 let edit_time = chrono::Utc.timestamp_opt(i_node.i_mtime as i64, 0).unwrap().to_string();
                 time_w = time_w.max(edit_time.len());
 
-                output.push([filename, mode, owner, size, create_time, edit_time])
+                // 如果是软链接，显示链接目标
+                let symlink_type: u8 = FileType::Symlink.into();
+                if entry.file_type == symlink_type {
+                    // 构建完整路径
+                    let full_path = if path.unwrap_or_default().is_empty() {
+                        utils::str(&entry.name).to_string()
+                    } else {
+                        format!("{}/{}", path.unwrap_or_default(), utils::str(&entry.name))
+                    };
+                    
+                    // 读取软链接的目标路径
+                    let target = match fs.read_symlink_target(&full_path) {
+                        Ok(target) => target,
+                        Err(_) => "invalid link".to_string(),
+                    };
+                    
+                    // 修改文件名以显示链接目标
+                    let filename_with_target = format!("{} -> {}", filename, target);
+                    output.push([filename_with_target, mode, owner, size, create_time, edit_time]);
+                } else {
+                    output.push([filename, mode, owner, size, create_time, edit_time])
+                }
             }
         }
 

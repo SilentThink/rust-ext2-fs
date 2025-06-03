@@ -102,6 +102,47 @@ impl Fs {
 
         Ok(())
     }
+    
+    /// 删除符号链接本身，而不是链接指向的文件
+    /// 
+    /// 参数:
+    /// - `path`: 符号链接的路径
+    /// 
+    /// 返回:
+    /// - `Result<()>`: 操作结果
+    pub fn rm_symlink(&mut self, path: &str) -> Result<()> {
+        // 使用path_parse_with_options并设置follow_symlinks为false，这样不会尝试解析符号链接
+        let path_res = self.path_parse_with_options(path, false)?;
+        let dir_entry = path_res.dir_entry;
+        
+        // 检查是否是符号链接
+        let symlink_type: u8 = FileType::Symlink.into();
+        if dir_entry.file_type != symlink_type {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "Not a symbolic link",
+            ));
+        }
+        
+        // 获取父目录的inode
+        let mut parent_inode = self.get_inode(path_res.parent_inode_i)?;
+        
+        // 删除目录项
+        let mut dir_entry = DirEntry::from_disk(&self.disk, path_res.dir_entry_addr)?;
+        dir_entry.i_node = 0;
+        dir_entry.rec_len = 1;
+        self.disk.write_at(dir_entry.bytes(), path_res.dir_entry_addr)?;
+        
+        // 更新父目录inode
+        parent_inode.i_size -= DIR_ENTRY_SIZE as u32;
+        parent_inode.i_mtime = utils::now();
+        self.write_inode(path_res.parent_inode_i, parent_inode)?;
+        
+        // 释放符号链接的inode
+        self.free(BlkType::INode, &[dir_entry.i_node])?;
+        
+        Ok(())
+    }
 }
 
 #[test]

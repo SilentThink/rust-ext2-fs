@@ -50,7 +50,7 @@ impl Shell {
         let cmds = self.cmds.clone();
 
         loop {
-            print!("[{}] ", self.fs.pwd().unwrap_or("???".into()).green());
+            print!("[{}] ", self.fs.pwd().green());
             std::io::stdout().flush().unwrap();
 
             let mut input = String::new();

@@ -51,10 +51,7 @@ async fn get_current_directory(shell: web::Data<SharedShell>) -> Result<impl Res
     let mut shell = shell.lock().unwrap();
     
     // 获取当前路径
-    let path = match shell.fs.pwd() {
-        Ok(path) => path,
-        Err(e) => return Ok(HttpResponse::InternalServerError().json(format!("获取当前路径失败: {}", e))),
-    };
+    let path = shell.fs.pwd();
     
     // 获取目录内容
     let mut items = Vec::new();
@@ -78,6 +75,7 @@ async fn get_current_directory(shell: web::Data<SharedShell>) -> Result<impl Res
                     let is_dir = match entry.file_type.into() {
                         crate::fs::FileType::Dir => true,
                         crate::fs::FileType::File => false,
+                        crate::fs::FileType::Symlink => false,
                     };
                     
                     // 获取inode信息
@@ -125,7 +123,7 @@ async fn change_directory(shell: web::Data<SharedShell>, path: web::Json<String>
     
     match shell.fs.chdir(&path) {
         Ok(_) => {
-            let current_path = shell.fs.pwd().unwrap_or_else(|_| "Unknown".to_string());
+            let current_path = shell.fs.pwd();
             Ok(HttpResponse::Ok().json(CommandResponse {
                 success: true,
                 output: current_path,
@@ -157,14 +155,7 @@ async fn execute_command(shell: web::Data<SharedShell>, cmd_req: web::Json<Comma
             // 对于pwd命令，使用特殊处理
             if cmd_req.cmd == "pwd" {
                 handled = true;
-                if let Ok(path) = shell.fs.pwd() {
-                    output_text = path;
-                } else {
-                    return Ok(HttpResponse::InternalServerError().json(CommandResponse {
-                        success: false,
-                        output: "获取当前路径失败".to_string(),
-                    }));
-                }
+                output_text = shell.fs.pwd();
             } else if cmd_req.cmd == "help" || cmd_req.cmd == "?" {
                 // 对help命令特殊处理
                 handled = true;
@@ -189,6 +180,7 @@ async fn execute_command(shell: web::Data<SharedShell>, cmd_req: web::Json<Comma
                                 let file_type = match entry.file_type.into() {
                                     crate::fs::FileType::Dir => "[目录]",
                                     crate::fs::FileType::File => "[文件]",
+                                    crate::fs::FileType::Symlink => "[链接]",
                                 };
                                 
                                 ls_output.push_str(&format!("{} {}\n", file_type, filename));

@@ -4,6 +4,7 @@ use super::*;
 pub enum FileType {
     File,
     Dir,
+    Symlink,
 }
 
 impl Into<u8> for FileType {
@@ -11,6 +12,7 @@ impl Into<u8> for FileType {
         match self {
             Self::File => 1,
             Self::Dir => 2,
+            Self::Symlink => 3,
         }
     }
 }
@@ -20,6 +22,7 @@ impl From<u8> for FileType {
         match n {
             1 => Self::File,
             2 => Self::Dir,
+            3 => Self::Symlink,
             _ => unreachable!("Unknown file type"),
         }
     }
@@ -47,6 +50,7 @@ impl FileMode {
             mode: match file_type {
                 FileType::File => 0b00_111_100,
                 FileType::Dir => 0b00_111_101,
+                FileType::Symlink => 0b00_111_100,
             },
             owner: owner as u8,
         }

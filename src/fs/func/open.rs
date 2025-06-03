@@ -15,6 +15,7 @@ impl Fs {
             ));
         }
 
+        // 使用path_parse_with_options函数解析路径，并设置follow_symlinks为true
         let path = self.path_parse(path)?;
 
         // 不能打开目录
