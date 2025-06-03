@@ -174,6 +174,35 @@ function setupContextMenu() {
         fileContextMenu.style.display = 'none';
     });
     
+    // 绑定删除菜单项点击事件
+    document.getElementById('delete-item').addEventListener('click', (e) => {
+        console.log('点击删除');
+        e.stopPropagation();
+        
+        if (currentRightClickedItem) {
+            // 确认删除
+            const itemName = currentRightClickedItem.name;
+            const isDirectory = currentRightClickedItem.is_dir;
+            const isSymlink = currentRightClickedItem.is_symlink;
+            
+            if (confirm(`确定要删除 "${itemName}" 吗？`)) {
+                if (isSymlink) {
+                    // 删除软链接使用 rm（无论指向文件还是目录）
+                    executeCommand('rm', [itemName]);
+                } else if (isDirectory) {
+                    // 删除目录使用 rm -r
+                    executeCommand('rm', ['-r', itemName]);
+                } else {
+                    // 删除文件使用 rm
+                    executeCommand('rm', [itemName]);
+                }
+            }
+        }
+        
+        // 隐藏右键菜单
+        fileContextMenu.style.display = 'none';
+    });
+    
     // 按下ESC键隐藏菜单
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
