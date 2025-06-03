@@ -129,6 +129,7 @@ impl Fs {
         
         // 删除目录项
         let mut dir_entry = DirEntry::from_disk(&self.disk, path_res.dir_entry_addr)?;
+        let symlink_inode_i = dir_entry.i_node; // 保存要释放的inode编号
         dir_entry.i_node = 0;
         dir_entry.rec_len = 1;
         self.disk.write_at(dir_entry.bytes(), path_res.dir_entry_addr)?;
@@ -139,7 +140,7 @@ impl Fs {
         self.write_inode(path_res.parent_inode_i, parent_inode)?;
         
         // 释放符号链接的inode
-        self.free(BlkType::INode, &[dir_entry.i_node])?;
+        self.free(BlkType::INode, &[symlink_inode_i])?;
         
         Ok(())
     }
