@@ -191,32 +191,88 @@ impl Zip {
 
 impl Cmd for Zip {
     fn description(&self) -> String {
-        "Compress files and directories using simple RLE compression".into()
+        "Compress multiple files and directories into a single archive using RLE compression".into()
     }
 
     fn run(&self, shell: &mut Shell, argv: &[&str]) {
-        if argv.len() != 2 {
-            println!("Usage: zip <source_path> <compressed_file>");
+        if argv.len() < 2 {
+            println!("Usage: zip <archive_file> <file1> [file2] [file3] ...");
+            println!("       zip -r <archive_file> <directory1> [directory2] ...");
             return;
         }
 
-        let source_path = argv[0];
-        let compressed_file = argv[1];
-
-        // 检查源路径是否存在
-        if let Err(e) = shell.fs.path_parse(source_path) {
-            println!("Error accessing source path {}: {}", source_path, e);
-            return;
-        }
-
-        // 收集所有文件（递归处理目录）
-        let files = match Self::collect_files_recursive(shell, source_path, source_path) {
-            Ok(files) => files,
-            Err(e) => {
-                println!("Error collecting files from {}: {}", source_path, e);
+        let mut recursive = false;
+        let mut start_idx = 0;
+        
+        // 检查是否有 -r 选项
+        if argv[0] == "-r" {
+            if argv.len() < 3 {
+                println!("Usage: zip -r <archive_file> <directory1> [directory2] ...");
                 return;
             }
-        };
+            recursive = true;
+            start_idx = 1;
+        }
+        
+        let compressed_file = argv[start_idx];
+        let source_paths = &argv[start_idx + 1..];
+        
+        if source_paths.is_empty() {
+            println!("Error: No source files or directories specified");
+            return;
+        }
+
+        // 收集所有文件
+        let mut all_files = Vec::new();
+        
+        for source_path in source_paths {
+            // 检查源路径是否存在
+            if let Err(e) = shell.fs.path_parse(source_path) {
+                println!("Error accessing source path {}: {}", source_path, e);
+                return;
+            }
+            
+            // 检查是否为目录
+            let path_info = match shell.fs.path_parse(source_path) {
+                Ok(info) => info,
+                Err(e) => {
+                    println!("Error parsing path {}: {}", source_path, e);
+                    return;
+                }
+            };
+            
+            let is_directory = matches!(path_info.dir_entry.file_type.into(), FileType::Dir);
+            
+            // 如果是目录但没有 -r 选项，跳过
+            if is_directory && !recursive {
+                println!("zip: {}: is a directory (use -r to include directories)", source_path);
+                continue;
+            }
+            
+            // 收集文件（递归或非递归）
+            let files = if is_directory {
+                match Self::collect_files_recursive(shell, source_path, ".") {
+                    Ok(files) => files,
+                    Err(e) => {
+                        println!("Error collecting files from {}: {}", source_path, e);
+                        return;
+                    }
+                }
+            } else {
+                // 单个文件
+                match Self::collect_files_recursive(shell, source_path, ".") {
+                    Ok(files) => files,
+                    Err(e) => {
+                        println!("Error collecting file {}: {}", source_path, e);
+                        return;
+                    }
+                }
+            };
+            
+            all_files.extend(files);
+        }
+        
+        let files = all_files;
 
         if files.is_empty() {
             println!("No files to compress");
@@ -269,10 +325,24 @@ impl Cmd for Zip {
         format!(
             "{}
 
-Usage: zip <source_path> <compressed_file>
+Usage: zip <archive_file> <file1> [file2] [file3] ...
+       zip -r <archive_file> <directory1> [directory2] ...
 
 Compress files and directories using simple RLE (Run-Length Encoding) compression.
-If source_path is a directory, all files and subdirectories will be compressed recursively.
+
+Options:
+  -r    Recursively compress directories and their contents
+
+Arguments:
+  <archive_file>    Name of the compressed archive file to create
+  <file1> ...       Files to compress
+  <directory1> ...  Directories to compress (requires -r option)
+
+Examples:
+  zip backup.zip file1.txt file2.txt        # Compress multiple files
+  zip -r project.zip src/ docs/              # Compress directories recursively
+  zip data.zip *.txt                         # Compress all .txt files
+
 The compressed file contains a multi-file archive format with file paths and compressed data.",
             self.description()
         )

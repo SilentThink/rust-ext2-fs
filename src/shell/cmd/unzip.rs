@@ -236,21 +236,57 @@ impl Unzip {
 
 impl Cmd for Unzip {
     fn description(&self) -> String {
-        "Decompress files and directories compressed with zip command".into()
+        "Extract files and directories from archives created with zip command".into()
     }
 
     fn run(&self, shell: &mut Shell, argv: &[&str]) {
-        if argv.len() < 1 || argv.len() > 2 {
-            println!("Usage: unzip <archive_file> [output_directory]");
+        if argv.is_empty() {
+            println!("Usage: unzip [options] <archive_file> [files...]");
+            println!("       unzip -l <archive_file>          # List archive contents");
+            println!("       unzip -d <dir> <archive_file>    # Extract to directory");
             return;
         }
         
-        let archive_file = argv[0];
-        let output_dir = if argv.len() == 2 {
-            argv[1]
-        } else {
-            "."
-        };
+        let mut list_only = false;
+        let mut output_dir = ".";
+        let mut archive_file = "";
+        let mut extract_files: Vec<&str> = Vec::new();
+        let mut i = 0;
+        
+        // 解析命令行参数
+        while i < argv.len() {
+            match argv[i] {
+                "-l" => {
+                    list_only = true;
+                    i += 1;
+                }
+                "-d" => {
+                    if i + 1 >= argv.len() {
+                        println!("Error: -d option requires a directory argument");
+                        return;
+                    }
+                    output_dir = argv[i + 1];
+                    i += 2;
+                }
+                arg if !arg.starts_with('-') => {
+                    if archive_file.is_empty() {
+                        archive_file = arg;
+                    } else {
+                        extract_files.push(arg);
+                    }
+                    i += 1;
+                }
+                _ => {
+                    println!("Error: Unknown option {}", argv[i]);
+                    return;
+                }
+            }
+        }
+        
+        if archive_file.is_empty() {
+            println!("Error: No archive file specified");
+            return;
+        }
         
         // 读取压缩文件
         let fd_src = match shell.fs.open(archive_file) {
@@ -285,7 +321,46 @@ impl Cmd for Unzip {
         match Self::parse_archive(&archive_data) {
             Ok(files) => {
                 // 新格式：包含多个文件和目录的档案
-                println!("Extracting {} items from archive...", files.len());
+                
+                if list_only {
+                    // 列出档案内容
+                    println!("Archive: {}", archive_file);
+                    println!("  Length      Date    Time    Name");
+                    println!("---------  ---------- -----   ----");
+                    
+                    let mut total_size = 0;
+                    for (path, data) in &files {
+                        let size = data.len();
+                        total_size += size;
+                        
+                        if path.ends_with('/') {
+                            println!("{:>9}  ---------- -----   {}", 0, path);
+                        } else {
+                            println!("{:>9}  ---------- -----   {}", size, path);
+                        }
+                    }
+                    println!("---------                     -------");
+                    println!("{:>9}                     {} files", total_size, files.len());
+                    return;
+                }
+                
+                // 过滤要提取的文件
+                let files_to_extract = if extract_files.is_empty() {
+                    files
+                } else {
+                    files.into_iter().filter(|(path, _)| {
+                        extract_files.iter().any(|pattern| {
+                            path.contains(pattern) || path.ends_with(pattern)
+                        })
+                    }).collect()
+                };
+                
+                if files_to_extract.is_empty() {
+                    println!("No matching files found in archive");
+                    return;
+                }
+                
+                println!("Extracting {} items from archive...", files_to_extract.len());
                 
                 // 如果输出目录不是当前目录且不存在，则创建它
                 if output_dir != "." {
@@ -298,7 +373,7 @@ impl Cmd for Unzip {
                 }
                 
                 // 提取文件和目录
-                if let Err(e) = Self::extract_files(shell, output_dir, files) {
+                if let Err(e) = Self::extract_files(shell, output_dir, files_to_extract) {
                     println!("Error extracting files: {}", e);
                     return;
                 }
@@ -381,19 +456,29 @@ impl Cmd for Unzip {
         format!(
             "{}
 
-Usage: unzip <archive_file> [output_directory]
+Usage: unzip [options] <archive_file> [files...]
 
 Decompress files and directories that were compressed using the zip command.
 Supports both new multi-file archive format and legacy single-file format.
 
+Options:
+  -l                  List archive contents without extracting
+  -d <directory>      Extract files to specified directory
+
 Arguments:
   <archive_file>      The compressed archive file to extract
-  [output_directory]  Directory to extract to (optional, defaults to current directory)
+  [files...]          Specific files to extract (optional, extracts all if not specified)
 
 Examples:
-  unzip data.zip              # Extract to current directory
-  unzip backup.zip ./restore  # Extract to restore directory
-  unzip file.zip output.txt   # Extract single file (legacy format)",
+  unzip data.zip                    # Extract all files to current directory
+  unzip -l backup.zip               # List contents of archive
+  unzip -d ./restore backup.zip     # Extract to restore directory
+  unzip data.zip file1.txt file2.txt # Extract specific files
+  unzip -d output data.zip *.txt    # Extract .txt files to output directory
+  unzip file.zip                    # Extract single file (legacy format)
+
+The command automatically detects archive format and handles both single-file
+and multi-file archives created with the zip command.",
             self.description()
         )
     }

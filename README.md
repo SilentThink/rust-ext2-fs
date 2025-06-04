@@ -410,29 +410,7 @@ alice             alice123
 
 ### 9. 压缩和解压文件
 ```
-[/root/test] zip file1.txt files.zip             
-File compressed successfully!
-Original size: 33 bytes
-Compressed size: 37 bytes (including 4-byte header)
-Compression ratio: 112.12%
-解压缩：
-[/root/test] unzip files.zip file
-File decompressed successfully!
-Compressed size: 37 bytes (including 4-byte header)
-Decompressed size: 33 bytes
-[/root/test] ls
-Name
-.
-..
-file1.txt
-file2.txt
-hardlink
-symlink -> file2.txt
-files.zip
-File
-[/root/test] cd file
-[/root/test/file] cat file1.txt
-Hello World!This is a test file.
+todo:
 ```
 ### 10 同时删除多个文件
 ```
