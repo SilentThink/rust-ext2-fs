@@ -1,4 +1,4 @@
-use crate::{shell::Shell, fs::Result};
+use crate::{shell::Shell, fs::Result, fs::{FileType, DirEntryIterItem, Item}};
 use super::Cmd;
 
 pub struct Zip;
@@ -46,55 +46,188 @@ impl Zip {
         
         Ok(compressed)
     }
+
+    fn collect_files_recursive(shell: &mut Shell, path: &str, base_path: &str) -> Result<Vec<(String, Vec<u8>)>> {
+        let mut files = Vec::new();
+        
+        // 获取路径信息
+        let path_info = shell.fs.path_parse(path)?;
+        
+        // 检查是否为目录
+        if matches!(path_info.dir_entry.file_type.into(), FileType::Dir) {
+            // 收集目录中的所有条目信息
+            let mut entries = Vec::new();
+            for item in path_info.dir_entry.iter(&shell.fs)? {
+                if let DirEntryIterItem::Using(Item { entry, .. }) = item {
+                    let entry_name = crate::fs::utils::str(&entry.name);
+                    
+                    // 跳过 "." 和 ".." 目录
+                    if entry_name == "." || entry_name == ".." {
+                        continue;
+                    }
+                    
+                    entries.push((entry_name.to_string(), entry.file_type.into()));
+                }
+            }
+            
+            // 处理收集到的条目
+            for (entry_name, file_type) in entries {
+                let full_path = if path == "." {
+                    entry_name.clone()
+                } else {
+                    format!("{}/{}", path, entry_name)
+                };
+                
+                let relative_path = if base_path == "." {
+                    full_path.clone()
+                } else {
+                    full_path.strip_prefix(&format!("{}/", base_path))
+                        .unwrap_or(&full_path)
+                        .to_string()
+                };
+                
+                // 递归处理子目录或文件
+                match file_type {
+                    FileType::Dir => {
+                        // 添加目录标记
+                        files.push((format!("{}/", relative_path), Vec::new()));
+                        // 递归处理子目录
+                        let mut sub_files = Self::collect_files_recursive(shell, &full_path, base_path)?;
+                        files.append(&mut sub_files);
+                    }
+                    FileType::File => {
+                         // 读取文件内容
+                         let fd = shell.fs.open(&full_path)?;
+                         let mut file_data = Vec::new();
+                         loop {
+                             let mut buf = [0u8; 512];
+                             match shell.fs.read(fd, &mut buf) {
+                                 Ok(bytes_read) => {
+                                     if bytes_read == 0 {
+                                         break;
+                                     }
+                                     file_data.extend_from_slice(&buf[..bytes_read]);
+                                 }
+                                 Err(e) => {
+                                     shell.fs.close(fd).ok();
+                                     return Err(e);
+                                 }
+                             }
+                         }
+                         shell.fs.close(fd).ok();
+                         files.push((relative_path, file_data));
+                     }
+                    FileType::Symlink => {
+                        // 处理符号链接（暂时跳过）
+                        println!("Warning: Skipping symlink {}", relative_path);
+                    }
+                }
+            }
+        } else {
+            // 处理单个文件
+            let relative_path = if base_path == "." {
+                path.to_string()
+            } else {
+                path.strip_prefix(&format!("{}/", base_path))
+                    .unwrap_or(path)
+                    .to_string()
+            };
+            
+            let fd = shell.fs.open(path)?;
+            let mut file_data = Vec::new();
+            loop {
+                let mut buf = [0u8; 512];
+                match shell.fs.read(fd, &mut buf) {
+                    Ok(bytes_read) => {
+                        if bytes_read == 0 {
+                            break;
+                        }
+                        file_data.extend_from_slice(&buf[..bytes_read]);
+                    }
+                    Err(e) => {
+                        shell.fs.close(fd).ok();
+                        return Err(e);
+                    }
+                }
+            }
+            shell.fs.close(fd).ok();
+            files.push((relative_path, file_data));
+        }
+        
+        Ok(files)
+    }
+
+    fn create_archive(files: Vec<(String, Vec<u8>)>) -> Result<Vec<u8>> {
+        let mut archive = Vec::new();
+        
+        // 写入文件数量
+        let file_count = files.len() as u32;
+        archive.extend_from_slice(&file_count.to_le_bytes());
+        
+        // 写入文件信息和数据
+        for (path, data) in files {
+            // 写入路径长度和路径
+            let path_bytes = path.as_bytes();
+            let path_len = path_bytes.len() as u32;
+            archive.extend_from_slice(&path_len.to_le_bytes());
+            archive.extend_from_slice(path_bytes);
+            
+            // 压缩文件数据
+            let compressed_data = Self::compress_data(&data)?;
+            
+            // 写入原始大小和压缩后大小
+            let original_size = data.len() as u32;
+            let compressed_size = compressed_data.len() as u32;
+            archive.extend_from_slice(&original_size.to_le_bytes());
+            archive.extend_from_slice(&compressed_size.to_le_bytes());
+            
+            // 写入压缩数据
+            archive.extend_from_slice(&compressed_data);
+        }
+        
+        Ok(archive)
+    }
 }
 
 impl Cmd for Zip {
     fn description(&self) -> String {
-        "Compress file using simple RLE compression".into()
+        "Compress files and directories using simple RLE compression".into()
     }
 
     fn run(&self, shell: &mut Shell, argv: &[&str]) {
         if argv.len() != 2 {
-            println!("Usage: zip <source_file> <compressed_file>");
+            println!("Usage: zip <source_path> <compressed_file>");
             return;
         }
 
-        let source_file = argv[0];
+        let source_path = argv[0];
         let compressed_file = argv[1];
 
-        // 读取源文件内容
-        let fd_src = match shell.fs.open(source_file) {
-            Ok(fd) => fd,
+        // 检查源路径是否存在
+        if let Err(e) = shell.fs.path_parse(source_path) {
+            println!("Error accessing source path {}: {}", source_path, e);
+            return;
+        }
+
+        // 收集所有文件（递归处理目录）
+        let files = match Self::collect_files_recursive(shell, source_path, source_path) {
+            Ok(files) => files,
             Err(e) => {
-                println!("Error opening source file {}: {}", source_file, e);
+                println!("Error collecting files from {}: {}", source_path, e);
                 return;
             }
         };
 
-        let mut file_data = Vec::new();
-        loop {
-            let mut buf = [0u8; 512];
-            match shell.fs.read(fd_src, &mut buf) {
-                Ok(bytes_read) => {
-                    if bytes_read == 0 {
-                        break;
-                    }
-                    file_data.extend_from_slice(&buf[..bytes_read]);
-                }
-                Err(e) => {
-                    println!("Error reading file {}: {}", source_file, e);
-                    shell.fs.close(fd_src).ok();
-                    return;
-                }
-            }
+        if files.is_empty() {
+            println!("No files to compress");
+            return;
         }
-        shell.fs.close(fd_src).ok();
 
-        // 压缩数据
-        let compressed_data = match Self::compress_data(&file_data) {
+        // 创建压缩档案
+        let archive_data = match Self::create_archive(files) {
             Ok(data) => data,
             Err(e) => {
-                println!("Error compressing data: {}", e);
+                println!("Error creating archive: {}", e);
                 return;
             }
         };
@@ -113,44 +246,34 @@ impl Cmd for Zip {
             }
         };
 
-        // 写入压缩头信息（原始文件大小）
-        let original_size = file_data.len() as u32;
-        let size_bytes = original_size.to_le_bytes();
-        if let Err(e) = shell.fs.write(fd_dest, &size_bytes) {
-            println!("Error writing header: {}", e);
-            shell.fs.close(fd_dest).ok();
-            return;
-        }
-
-        // 写入压缩数据
-        if let Err(e) = shell.fs.write(fd_dest, &compressed_data) {
-            println!("Error writing compressed data: {}", e);
+        // 写入压缩档案数据
+        if let Err(e) = shell.fs.write(fd_dest, &archive_data) {
+            println!("Error writing archive data: {}", e);
             shell.fs.close(fd_dest).ok();
             return;
         }
 
         shell.fs.close(fd_dest).ok();
 
-        let compression_ratio = if file_data.len() > 0 {
-            (compressed_data.len() + 4) as f64 / file_data.len() as f64 * 100.0
-        } else {
-            100.0
-        };
-
-        println!("File compressed successfully!");
-        println!("Original size: {} bytes", file_data.len());
-        println!("Compressed size: {} bytes (including 4-byte header)", compressed_data.len() + 4);
-        println!("Compression ratio: {:.2}%", compression_ratio);
+        // 计算统计信息
+        let file_count = u32::from_le_bytes([
+            archive_data[0], archive_data[1], archive_data[2], archive_data[3]
+        ]);
+        
+        println!("Archive created successfully!");
+        println!("Files/directories compressed: {}", file_count);
+        println!("Archive size: {} bytes", archive_data.len());
     }
 
     fn help(&self) -> String {
         format!(
             "{}
 
-Usage: zip <source_file> <compressed_file>
+Usage: zip <source_path> <compressed_file>
 
-Compress a file using simple RLE (Run-Length Encoding) compression.
-The compressed file includes a 4-byte header containing the original file size.",
+Compress files and directories using simple RLE (Run-Length Encoding) compression.
+If source_path is a directory, all files and subdirectories will be compressed recursively.
+The compressed file contains a multi-file archive format with file paths and compressed data.",
             self.description()
         )
     }

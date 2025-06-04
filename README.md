@@ -208,7 +208,7 @@ cargo doc --no-deps --document-private-items --release --open
 - [x] 实现fs对软链接的支持,并添加对应的shell命令
 - [x] 在gui界面添加快捷方式的创建功能
 - [x] 实现fs压缩/解压缩功能,并添加对应的shell命令zip和unzip
-- [ ] 拓展zip和unzip对目录的支持
+- [x] 拓展zip和unzip对目录的支持
 - [ ] 实现mv命令
 - [ ] 本地终端shell实现记录历史命令,上下方向键浏览历史命令
 - [x] web shell实现记录历史命令,上下方向键浏览历史命令
