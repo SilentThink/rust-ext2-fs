@@ -1,14 +1,20 @@
-pub mod cmd;
+use crate::fs::Fs;
 
-use std::io::Write;
+mod cmd;
+mod history;
+mod input;
+mod completion;
 
 use self::cmd::Cmds;
-use super::fs::Fs;
+use self::input::InputManager;
+use self::completion::Completion;
 use crossterm::style::Stylize;
 
 pub struct Shell {
     pub fs: Fs,
     pub cmds: Cmds,
+    input_manager: InputManager,
+    completion: Completion,
 }
 
 impl Shell {
@@ -28,9 +34,14 @@ impl Shell {
             }
         };
 
+        let cmds = cmd::cmds();
+        let completion = Completion::new(&cmds);
+
         Self {
             fs,
-            cmds: cmd::cmds(),
+            cmds,
+            input_manager: InputManager::new(),
+            completion,
         }
     }
 
@@ -41,6 +52,7 @@ impl Shell {
             "\n {} ",
             " Welcome to simple unix like filesystem. ".on_white().black()
         );
+        println!("提示: 使用上下方向键浏览历史命令，Tab键自动补全，Ctrl+L清屏，Ctrl+C退出");
         println!("");
 
         if !cmd::login::Login::login(&mut self.fs) {
@@ -50,11 +62,22 @@ impl Shell {
         let cmds = self.cmds.clone();
 
         loop {
-            print!("[{}] ", self.fs.pwd().green());
-            std::io::stdout().flush().unwrap();
-
-            let mut input = String::new();
-            std::io::stdin().read_line(&mut input).unwrap();
+            let prompt = format!("[{}] ", self.fs.pwd().green());
+            
+            // 使用新的输入管理器读取输入，支持自动补全
+            let input = match self.input_manager.read_line_with_completion(&prompt, &mut self.fs, &self.completion) {
+                Ok(input) => input,
+                Err(e) => {
+                    eprintln!("输入错误: {}", e);
+                    continue;
+                }
+            };
+            
+            // 检查是否是中断信号（Ctrl+C）
+            if input.is_empty() {
+                continue;
+            }
+            
             let mut argv: Vec<&str> = input
                 .trim()
                 .split(' ')
@@ -66,7 +89,9 @@ impl Shell {
                 continue;
             }
 
-            match cmds.get(argv.remove(0)) {
+            let cmd_name = argv.remove(0);
+            
+            match cmds.get(cmd_name) {
                 Some(cmd) => match argv.contains(&"-h") {
                     true => println!("{}", cmd.help()),
                     false => cmd.run(self, &argv),
