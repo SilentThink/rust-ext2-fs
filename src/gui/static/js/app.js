@@ -2,6 +2,8 @@
 let currentPath = '';
 let commandHistory = [];
 let historyIndex = -1;
+// 存储复制的文件信息
+let copiedItem = null;
 
 // DOM元素
 const fileListElement = document.getElementById('file-list');
@@ -201,6 +203,71 @@ function setupContextMenu() {
         
         // 隐藏右键菜单
         fileContextMenu.style.display = 'none';
+    });
+    
+    // 绑定复制菜单项点击事件
+    document.getElementById('copy-item').addEventListener('click', (e) => {
+        console.log('点击复制');
+        e.stopPropagation();
+        
+        if (currentRightClickedItem) {
+            // 存储复制的文件信息
+            copiedItem = {
+                name: currentRightClickedItem.name,
+                is_dir: currentRightClickedItem.is_dir,
+                is_symlink: currentRightClickedItem.is_symlink,
+                path: currentPath
+            };
+            
+            // 显示提示信息
+            appendToTerminal(`已复制: ${copiedItem.name}`, 'system');
+        }
+        
+        // 隐藏右键菜单
+        fileContextMenu.style.display = 'none';
+    });
+    
+    // 绑定粘贴菜单项点击事件
+    document.getElementById('paste-item').addEventListener('click', (e) => {
+        console.log('点击粘贴');
+        e.stopPropagation();
+        
+        if (copiedItem) {
+            // 检查是否在同一目录下粘贴
+            if (copiedItem.path === currentPath) {
+                // 在同一目录下粘贴，需要重命名
+                const originalName = copiedItem.name;
+                const newName = `${originalName}_copy`;
+                
+                // 根据文件类型执行不同的复制命令
+                if (copiedItem.is_dir) {
+                    // 复制目录
+                    executeCommand('cp', ['-r', originalName, newName]);
+                } else {
+                    // 复制文件
+                    executeCommand('cp', [originalName, newName]);
+                }
+            } else {
+                // 不同目录下粘贴，需要处理路径
+                const sourcePath = copiedItem.path === '/' ? 
+                    `/${copiedItem.name}` : 
+                    `${copiedItem.path}/${copiedItem.name}`;
+                
+                // 根据文件类型执行不同的复制命令
+                if (copiedItem.is_dir) {
+                    // 复制目录
+                    executeCommand('cp', ['-r', sourcePath, copiedItem.name]);
+                } else {
+                    // 复制文件
+                    executeCommand('cp', [sourcePath, copiedItem.name]);
+                }
+            }
+        } else {
+            appendToTerminal('没有可粘贴的内容', 'error');
+        }
+        
+        // 隐藏右键菜单
+        contextMenu.style.display = 'none';
     });
     
     // 按下ESC键隐藏菜单
@@ -557,7 +624,7 @@ async function executeCommand(cmd, args) {
             appendToTerminal(data.output, data.success ? 'output' : 'error');
             
             // 如果命令可能改变了文件系统状态，刷新目录内容
-            if (['mkdir', 'touch', 'rm', 'rmdir', 'cp', 'write', 'ln'].includes(cmd)) {
+            if (['mkdir', 'touch', 'rm', 'rmdir', 'cp', 'mv', 'write', 'ln'].includes(cmd)) {
                 refreshDirectory();
             }
         }

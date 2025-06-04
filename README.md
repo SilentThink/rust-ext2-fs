@@ -214,6 +214,7 @@ cargo doc --no-deps --document-private-items --release --open
 - [x] web shell实现记录历史命令,上下方向键浏览历史命令
 - [ ] shell实现tab键自动补全功能
 - [x] GUI界面支持文件内容编辑功能
+- [x] GUI界面支持对右键文件菜单中进行复制，右键空白区菜单中进行粘贴
 
 ## 使用指南
 
