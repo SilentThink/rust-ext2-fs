@@ -324,211 +324,54 @@ cargo doc --no-deps --document-private-items --release --open
    - 检查文件路径是否正确
    - 使用 `pwd` 确认当前目录
 
-#### 测试样例
 
-# 登录系统 (默认root/123)
+## 测试样例
+
+### 登录系统 (默认root/123)
+```
 [/] login
 username: root
 password: 123
 Login successful!
-
-# 1. 查看当前用户
+```
+### 1. 查看当前用户
+```
 [/root] whoami
 root
-
-# 2. 显示命令帮助
+```
+### 2. 显示命令帮助
+```
 [/root] ?/help
-?             Show all commands and its description
+```
 
-# 3. 创建目录、cd操作和显示路径
+### 3. 创建目录、cd操作和显示路径
+```
 [/root] mkdir test
 [/root] cd test
 [/root/test] mkdir test4
 [/root/test] pwd
 /root/test
-
-# 4. 创建文件、写文件
+```
+### 4. 创建文件、写文件
+```
 [/root/test] touch file1.txt
 [/root/test] write file1.txt
 Enter content (end with empty line):
 Hello World!
 This is a test file.
-# 5. 展示文件内容
+```
+### 5. 展示文件内容
+```
 [/root/test] cat file1.txt
 Hello World!
 This is a test file.
+```
 
-# 6. 复制文件
+### 6. 复制文件
+```
 [/root/test] cp file1.txt file2.txt
 [/root/test] cp -r test4 test4_2
 [/root/test] ls
-
-file1.txt file2.txt
-
-# 7. 链接创建
-[/root/test] ln file1.txt hardlink
-[/root/test] ln -s file2.txt symlink
-[/root/test] ls
-
-file1.txt file2.txt hardlink symlink
-
-[/root/test]  cat hardlink
-Hello World!This is a test file.
-[/root/test]  cat symlink 
-Hello World!This is a test file.
-# 8. 用户管理(创建和展示用户)
-[/root/test] useradd alice 123
-New user 'alice' added
-[/root/test] passwd alice
-New password:  alice123
-Press again:   alice123
-[/root/test] users
-User Name        Password        
-root             123             
-alice             alice123 
-# 9. 压缩和解压文件
-[/root/test] zip file1.txt files.zip            
-File compressed successfully!
-Original size: 33 bytes
-Compressed size: 37 bytes (including 4-byte header)
-Compression ratio: 112.12%
-解压缩：
-[/root/test] unzip files.zip file.txt
-File decompressed successfully!
-Compressed size: 37 bytes (including 4-byte header)
-Decompressed size: 33 bytes
-[/root/test] ls
-Name
-.
-..
-file1.txt
-file2.txt
-hardlink
-symlink -> file2.txt
-files.zip
-file.txt
-[/root/test] cat file.txt
-Hello World!This is a test file.
-
-# 10 同时删除多个文件
-[/test] rm file1.txt file2.txt
-[/root/test]  rm file1.txt file2.txt
-[/root/test] ls  
-Name
-.
-..
-hardlink
-symlink -> file2.txt
-files.zip
-file.txt
-
-# 10. 删除目录
-[/] cd ..
-[/] mkdir test1
-[/] rmdir test1
-[/]mkdir test2
-[/]cd test2
-[/] touch file1.txt
-[/]cd ..
-[/] rm -r test2
-
-# 11.权限修改
-[/root/test] chmod rwx:r-- file.txt
-[/root/test] cd ..
-[/root] touch file2.txt
-[/root] chmod rwx:r-- file2.txt
-[/root]chown alice /root/file2.txt
-
-# 12. 切换用户
-[/root/test] login
-:: default user: root, password: 123
-username: alice
-password: 123
-
-去往test文件夹下
-[/home/alice] ls
-Name
-.
-..
-[/home/alice] cd ..
-[/home] cd /
-[/] ls
-Name
-.
-..
-home
-root
-1.txt
-1.txt_shortcut -> 1.txt
-[/] cd root
-[/root] cd test
-写处理的权限判断
-[/root/test] write file.txt     
-file.txt: Need write permission
-
-# 13. 所有权管理 (需root)的判断
-[/root/test] chown alice file.txt
-Permission denied
-[/root/test] cd ..
-[/root] write file2.txt
-
-# 14. 退出系统
-[/] exit
-Connection closed.
-
-# 11. 格式化
-[/home/alice] cd /                       
-[/] chown alice /home/alice
-[/]  format /home/alice    
-!!! This opretion will wipe all data in this disk
-!!! Continue ? [Y/N]   y
-[/] cd home
-[/home] ls
-Name
-.
-..
-[/home] 
-
-
-#### 测试样例
-
-# 登录系统 (默认root/123)
-[/] login
-username: root
-password: 123
-Login successful!
-
-# 1. 查看当前用户
-[/root] whoami
-root
-
-# 2. 显示命令帮助
-[/root] ?/help
-?             Show all commands and its description
-
-# 3. 创建目录、cd操作和显示路径
-[/root] mkdir test
-[/root] cd test
-[/root/test] mkdir test4
-[/root/test] pwd
-/root/test
-
-# 4. 创建文件、写文件
-[/root/test] touch file1.txt
-[/root/test] write file1.txt
-Enter content (end with empty line):
-Hello World!
-This is a test file.
-# 5. 展示文件内容
-[/root/test] cat file1.txt
-Hello World!
-This is a test file.
-
-# 6. 复制文件
-[/root/test] cp file1.txt file2.txt
-[/root/test] cp -r test4 test4_2
-[/root/test] ls
-
 Name
 .
 ..
@@ -536,31 +379,38 @@ test4
 file1.txt
 file2.txt
 test4_2
+```
 
-
-# 7. 链接创建
+### 7. 链接创建
+```
 [/root/test] ln file1.txt hardlink
 [/root/test] ln -s file2.txt symlink
 [/root/test] ls
 
 file1.txt file2.txt hardlink symlink
 
-[/root/test]  cat hardlink
+[/root/test]  cat hardlink
 Hello World!This is a test file.
-[/root/test]  cat symlink 
+[/root/test]  cat symlink 
 Hello World!This is a test file.
-# 8. 用户管理(创建和展示用户)
+```
+
+### 8. 用户管理(创建和展示用户)
+```
 [/root/test] useradd alice 123
 New user 'alice' added
 [/root/test] passwd alice
-New password:  alice123
-Press again:   alice123
+New password:  alice123
+Press again:   alice123
 [/root/test] users
-User Name        Password        
-root             123             
-alice             alice123 
-# 9. 压缩和解压文件
-[/root/test] zip file1.txt files.zip            
+User Name        Password         
+root             123             
+alice             alice123 
+```
+
+### 9. 压缩和解压文件
+```
+[/root/test] zip file1.txt files.zip             
 File compressed successfully!
 Original size: 33 bytes
 Compressed size: 37 bytes (including 4-byte header)
@@ -583,10 +433,11 @@ File
 [/root/test] cd file
 [/root/test/file] cat file1.txt
 Hello World!This is a test file.
-
-# 10 同时删除多个文件
-[/root/test]  rm file1.txt file2.txt
-[/root/test] ls  
+```
+### 10 同时删除多个文件
+```
+[/root/test]  rm file1.txt file2.txt
+[/root/test] ls  
 Name
 .
 ..
@@ -594,8 +445,10 @@ hardlink
 symlink -> file2.txt
 files.zip
 file.txt
+```
 
-# 10. 删除目录
+### 11. 删除目录
+```
 [/] cd ..
 [/] mkdir test1
 [/] rmdir test1
@@ -604,16 +457,20 @@ file.txt
 [/] touch file1.txt
 [/]cd ..
 [/] rm -r test2
+```
 
-# 11.权限修改
+### 12.权限修改
+```
 [/root/test]cd file
 [/root/test/file] chmod rwx:r-- file1.txt
 [/root/test] cd ..
 [/root] touch file2.txt
 [/root] chmod rwx:r-- file2.txt
 [/root]chown alice /root/file2.txt
+```
 
-# 12. 切换用户
+### 13. 切换用户
+```
 [/root/test] login
 :: default user: root, password: 123
 username: alice
@@ -638,26 +495,33 @@ root
 [/root] cd test
 [/root/test]cd file
 写处理的权限判断
-[/root/test/file] write file1.txt     
+[/root/test/file] write file1.txt     
 file.txt: Need write permission
+```
 
-# 13. 所有权管理 (需root)的判断
+### 14. 所有权管理 (需root)的判断
+```
 [/root/test/file] chown alice file1.txt
 Permission denied
 [/root/test] cd ..
 [/root] write file2.txt  #这里前面只设置了读权限，但是后来把整个文件的权限都给了alice用户，因此这里应该是成功的
+```
 
-# 14. 退出系统
-[/] exit
-Connection closed.
-
-# 11. 格式化                     
-[/]  format  
+### 15. 格式化    
+```             
+[/]  format  
 !!! This opretion will wipe all data in this disk
-!!! Continue ? [Y/N]   y
+!!! Continue ? [Y/N]   y
 [/] cd home
 [/home] ls
 Name
 .
 ..
 [/home] 
+```
+
+### 16. 退出系统
+```
+[/] exit
+Connection closed.
+```
