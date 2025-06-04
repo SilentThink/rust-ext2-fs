@@ -24,6 +24,8 @@ mod userdel;
 mod users;
 mod whoami;
 mod write;
+mod zip;
+mod unzip;
 
 pub mod login;
 
@@ -31,6 +33,7 @@ use {
     cat::Cat, cd::Cd, chmod::Chmod, chown::Chown, clear::Clear, cp::Cp, exit::Exit, format::Format,
     help::Help, ln::Ln, login::Login, ls::Ls, mkdir::Mkdir, passwd::Passwd, pwd::Pwd, rm::Rm, rmdir::RmDir,
     touch::Touch, useradd::Useradd, userdel::UserDel, users::Users, whoami::Whoami, write::Write,
+    zip::Zip, unzip::Unzip,
 };
 
 pub trait Cmd: Send + Sync {
@@ -69,5 +72,7 @@ pub fn cmds() -> Cmds {
         ("chown", Box::new(Chown) as Box<dyn Cmd + Send + Sync>),
         ("users", Box::new(Users) as Box<dyn Cmd + Send + Sync>),
         ("clear", Box::new(Clear) as Box<dyn Cmd + Send + Sync>),
+        ("zip", Box::new(Zip) as Box<dyn Cmd + Send + Sync>),
+        ("unzip", Box::new(Unzip) as Box<dyn Cmd + Send + Sync>),
     ]))
 }

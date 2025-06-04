@@ -49,7 +49,7 @@ pub struct CommandResponse {
 
 /// 获取当前目录内容
 async fn get_current_directory(shell: web::Data<SharedShell>) -> Result<impl Responder> {
-    let mut shell = shell.lock().unwrap();
+    let shell = shell.lock().unwrap();
     
     // 获取当前路径
     let path = shell.fs.pwd();
