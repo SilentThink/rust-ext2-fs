@@ -2,11 +2,75 @@ pub mod cmd;
 
 use std::io::Write;
 use rustyline::error::ReadlineError;
-use rustyline::DefaultEditor;
+use rustyline::{Editor, Config};
+use rustyline::completion::{Completer, Pair};
+use rustyline::highlight::Highlighter;
+use rustyline::hint::Hinter;
+use rustyline::validate::Validator;
+use rustyline::Helper;
 
 use self::cmd::Cmds;
 use super::fs::Fs;
 use crossterm::style::Stylize;
+
+// 简化的补全器，只支持命令补全
+pub struct SimpleCompleter {
+    commands: Vec<String>,
+}
+
+impl SimpleCompleter {
+    fn new(cmds: &Cmds) -> Self {
+        let commands = cmds.keys().map(|&s| s.to_string()).collect();
+        Self { commands }
+    }
+}
+
+impl Completer for SimpleCompleter {
+    type Candidate = Pair;
+
+    fn complete(
+        &self,
+        line: &str,
+        pos: usize,
+        _ctx: &rustyline::Context<'_>,
+    ) -> rustyline::Result<(usize, Vec<Pair>)> {
+        let mut completions = Vec::new();
+        
+        // 获取光标前的内容
+        let before_cursor = &line[..pos];
+        let words: Vec<&str> = before_cursor.split_whitespace().collect();
+        
+        // 只在第一个词时进行命令补全
+        if words.is_empty() || (words.len() == 1 && !before_cursor.ends_with(' ')) {
+            let prefix = if words.is_empty() { "" } else { words[0] };
+            let start_pos = pos - prefix.len();
+            
+            for cmd in &self.commands {
+                if cmd.starts_with(prefix) {
+                    completions.push(Pair {
+                        display: cmd.clone(),
+                        replacement: cmd.clone(),
+                    });
+                }
+            }
+            
+            Ok((start_pos, completions))
+        } else {
+            // 对于参数，暂时不提供补全
+            Ok((pos, completions))
+        }
+    }
+}
+
+impl Hinter for SimpleCompleter {
+    type Hint = String;
+}
+
+impl Highlighter for SimpleCompleter {}
+
+impl Validator for SimpleCompleter {}
+
+impl Helper for SimpleCompleter {}
 
 pub struct Shell {
     pub fs: Fs,
@@ -50,7 +114,12 @@ impl Shell {
         }
 
         // 创建rustyline编辑器实例
-        let mut rl = match DefaultEditor::new() {
+        let config = Config::builder()
+            .history_ignore_space(true)
+            .completion_type(rustyline::CompletionType::List)
+            .build();
+            
+        let mut rl = match Editor::with_config(config) {
             Ok(editor) => editor,
             Err(err) => {
                 println!("Failed to create readline editor: {}", err);
@@ -59,6 +128,10 @@ impl Shell {
                 return;
             }
         };
+
+        // 设置补全器（使用一个简化的补全器，只支持命令补全）
+        let completer = SimpleCompleter::new(&self.cmds);
+        rl.set_helper(Some(completer));
 
         // 尝试加载历史记录文件
         let history_file = "fs_history.txt";
@@ -69,7 +142,7 @@ impl Shell {
 
         let cmds = self.cmds.clone();
 
-        println!("提示：使用上下方向键浏览历史命令，Ctrl+C退出");
+        println!("提示：使用上下方向键浏览历史命令，Tab键自动补全命令，Ctrl+C退出");
         println!("");
 
         loop {

@@ -220,7 +220,7 @@ cargo doc --no-deps --document-private-items --release --open
 - [x] 实现mv命令
 - [x] 本地终端shell实现记录历史命令,上下方向键浏览历史命令
 - [x] web shell实现记录历史命令,上下方向键浏览历史命令
-- [ ] shell实现tab键自动补全功能
+- [x] shell实现tab键自动补全功能
 - [x] GUI界面支持文件内容编辑功能
 - [x] GUI界面支持对右键文件菜单中进行复制，右键空白区菜单中进行粘贴
 
@@ -236,6 +236,7 @@ cargo doc --no-deps --document-private-items --release --open
    命令行界面现在支持：
    - **历史命令记录**：自动保存命令历史到 `fs_history.txt` 文件
    - **方向键浏览**：使用上下方向键浏览历史命令
+   - **Tab键自动补全**：输入命令前几个字符后按Tab键自动补全命令名
    - **快捷键支持**：
      - `Ctrl+C`：中断当前输入
      - `Ctrl+D`：退出程序
