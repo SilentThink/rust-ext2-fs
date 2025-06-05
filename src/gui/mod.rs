@@ -330,6 +330,7 @@ async fn execute_command(shell: web::Data<SharedShell>, cmd_req: web::Json<Comma
                 }
             } else if cmd_req.cmd == "rmdir" || cmd_req.cmd == "rm" || cmd_req.cmd == "mkdir" || 
                     cmd_req.cmd == "touch" || cmd_req.cmd == "chmod" || cmd_req.cmd == "chown" || 
+                    cmd_req.cmd == "mv" || cmd_req.cmd == "cp" || cmd_req.cmd == "ln" ||
                     cmd_req.cmd == "useradd" || cmd_req.cmd == "userdel" || cmd_req.cmd == "passwd" {
                 // 执行文件系统修改命令
                 let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
