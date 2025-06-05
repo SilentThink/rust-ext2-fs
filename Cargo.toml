@@ -15,6 +15,9 @@ chrono = "0.4.19"
 # 用来在终端上显示彩色文本
 crossterm = "0.23.2"
 
+# 命令行编辑和历史记录
+rustyline = "13.0"
+
 # Web框架
 actix-web = "4.3.1"
 actix-files = "0.6.2"

@@ -104,6 +104,7 @@ src
    所有依赖会自动安装，主要包括：
    - chrono: 处理时间和日期
    - crossterm: 终端彩色文本显示
+   - rustyline: 命令行编辑和历史记录
    - actix-web: Web服务器框架
    - serde: 序列化/反序列化支持
    - tokio: 异步运行时
@@ -217,7 +218,7 @@ cargo doc --no-deps --document-private-items --release --open
 - [x] 实现fs压缩/解压缩功能,并添加对应的shell命令zip和unzip
 - [x] 拓展zip和unzip对目录的支持
 - [x] 实现mv命令
-- [ ] 本地终端shell实现记录历史命令,上下方向键浏览历史命令
+- [x] 本地终端shell实现记录历史命令,上下方向键浏览历史命令
 - [x] web shell实现记录历史命令,上下方向键浏览历史命令
 - [ ] shell实现tab键自动补全功能
 - [x] GUI界面支持文件内容编辑功能
@@ -231,6 +232,14 @@ cargo doc --no-deps --document-private-items --release --open
    ```bash
    cargo run
    ```
+   
+   命令行界面现在支持：
+   - **历史命令记录**：自动保存命令历史到 `fs_history.txt` 文件
+   - **方向键浏览**：使用上下方向键浏览历史命令
+   - **快捷键支持**：
+     - `Ctrl+C`：中断当前输入
+     - `Ctrl+D`：退出程序
+   - **命令行编辑**：支持左右方向键、Home、End等编辑功能
 
 2. 启动Web图形界面：
    ```bash
