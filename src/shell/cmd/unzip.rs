@@ -1,4 +1,4 @@
-use crate::{shell::Shell, fs::Result, fs::FileType};
+use crate::{shell::Shell, fs::Result};
 use super::Cmd;
 
 pub struct Unzip;

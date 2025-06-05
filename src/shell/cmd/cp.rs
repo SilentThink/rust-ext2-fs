@@ -1,6 +1,5 @@
 use crate::fs::*;
 use super::*;
-use std::path::Path;
 
 pub struct Cp;
 
@@ -104,8 +103,8 @@ impl Cmd for Cp {
         }
         
         let mut recursive = false;
-        let mut src = "";
-        let mut dest = "";
+        let src;
+        let dest;
         
         // 解析参数
         if argv[0] == "-r" {

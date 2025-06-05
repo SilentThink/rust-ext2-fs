@@ -33,6 +33,7 @@ impl Fs {
         }
     }
 
+    #[allow(dead_code)]
     pub (in crate::fs) fn chdir_without_limit(&mut self, path: &str) -> Result<()> {
         let entry = self.path_parse(path)?.dir_entry;
         match entry.file_type.into() {
