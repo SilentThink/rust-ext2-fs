@@ -11,9 +11,11 @@ use rustyline::Helper;
 
 use self::cmd::Cmds;
 use super::fs::Fs;
+use super::fs::{DirEntryIterItem, Item};
+use super::fs::utils;
 use crossterm::style::Stylize;
 
-// 简化的补全器，只支持命令补全
+// 支持命令和文件名补全的补全器
 pub struct SimpleCompleter {
     commands: Vec<String>,
 }
@@ -23,9 +25,46 @@ impl SimpleCompleter {
         let commands = cmds.keys().map(|&s| s.to_string()).collect();
         Self { commands }
     }
+
+    // 获取当前目录下的文件名和目录名
+    fn get_current_dir_files(fs: &Fs) -> Vec<String> {
+        let mut files = Vec::new();
+        
+        // 使用当前目录解析当前路径
+        if let Ok(parsed_path) = fs.path_parse("") {
+            if let Ok(dir_entries) = parsed_path.dir_entry.iter(fs) {
+                for item in dir_entries {
+                    if let DirEntryIterItem::Using(Item { entry, .. }) = item {
+                        let filename = utils::str(&entry.name).to_string();
+                        // 跳过 "." 和 ".." 条目
+                        if filename != "." && filename != ".." {
+                            files.push(filename);
+                        }
+                    }
+                }
+            }
+        }
+        
+        files
+    }
 }
 
-impl Completer for SimpleCompleter {
+// 自定义Helper结构体，包含文件系统引用
+pub struct FileSystemHelper {
+    completer: SimpleCompleter,
+    fs_ref: *const Fs, // 使用原始指针来避免所有权问题
+}
+
+impl FileSystemHelper {
+    fn new(cmds: &Cmds, fs: &Fs) -> Self {
+        Self {
+            completer: SimpleCompleter::new(cmds),
+            fs_ref: fs as *const Fs,
+        }
+    }
+}
+
+impl Completer for FileSystemHelper {
     type Candidate = Pair;
 
     fn complete(
@@ -40,12 +79,13 @@ impl Completer for SimpleCompleter {
         let before_cursor = &line[..pos];
         let words: Vec<&str> = before_cursor.split_whitespace().collect();
         
-        // 只在第一个词时进行命令补全
+        // 确定是否是第一个词（命令），还是参数
         if words.is_empty() || (words.len() == 1 && !before_cursor.ends_with(' ')) {
+            // 补全命令
             let prefix = if words.is_empty() { "" } else { words[0] };
             let start_pos = pos - prefix.len();
             
-            for cmd in &self.commands {
+            for cmd in &self.completer.commands {
                 if cmd.starts_with(prefix) {
                     completions.push(Pair {
                         display: cmd.clone(),
@@ -56,21 +96,46 @@ impl Completer for SimpleCompleter {
             
             Ok((start_pos, completions))
         } else {
-            // 对于参数，暂时不提供补全
-            Ok((pos, completions))
+            // 补全文件名或目录名
+            // 获取当前正在输入的词（最后一个未完成的参数）
+            let current_word = if before_cursor.ends_with(' ') {
+                ""
+            } else {
+                // 找到最后一个空格后的内容
+                before_cursor.split_whitespace().last().unwrap_or("")
+            };
+            
+            let start_pos = pos - current_word.len();
+            
+            // 安全地访问文件系统引用
+            unsafe {
+                let fs = &*self.fs_ref;
+                let files = SimpleCompleter::get_current_dir_files(fs);
+                
+                for filename in files {
+                    if filename.starts_with(current_word) {
+                        completions.push(Pair {
+                            display: filename.clone(),
+                            replacement: filename,
+                        });
+                    }
+                }
+            }
+            
+            Ok((start_pos, completions))
         }
     }
 }
 
-impl Hinter for SimpleCompleter {
+impl Hinter for FileSystemHelper {
     type Hint = String;
 }
 
-impl Highlighter for SimpleCompleter {}
+impl Highlighter for FileSystemHelper {}
 
-impl Validator for SimpleCompleter {}
+impl Validator for FileSystemHelper {}
 
-impl Helper for SimpleCompleter {}
+impl Helper for FileSystemHelper {}
 
 pub struct Shell {
     pub fs: Fs,
@@ -155,9 +220,9 @@ impl Shell {
             }
         };
 
-        // 设置补全器（使用一个简化的补全器，只支持命令补全）
-        let completer = SimpleCompleter::new(&self.cmds);
-        rl.set_helper(Some(completer));
+        // 设置补全器，支持命令和文件名补全
+        let helper = FileSystemHelper::new(&self.cmds, &self.fs);
+        rl.set_helper(Some(helper));
 
         // 尝试加载历史记录文件
         let history_file = "fs_history.txt";
@@ -306,3 +371,4 @@ impl Shell {
         }
     }
 }
+
