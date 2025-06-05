@@ -62,6 +62,7 @@ src
 │  │  ├── cp.rs      // 复制文件和目录
 │  │  ├── exit.rs    // 退出终端
 │  │  ├── format.rs  // 格式化
+│  │  ├── grep.rs    // 文本搜索和模式匹配
 │  │  ├── help.rs    // 显示帮助信息
 │  │  ├── ln.rs      // 创建硬链接和软链接
 │  │  ├── login.rs   // 切换用户
@@ -303,6 +304,7 @@ cargo doc --no-deps --document-private-items --release --open
 | `whoami` | 显示当前用户 | `whoami` |
 | `chmod` | 修改文件权限 | `chmod rwx:r-- file.txt` |
 | `chown` | 修改文件所有者 | `chown username file.txt` |
+| `grep` | 文本搜索和模式匹配 | `grep 'pattern' file.txt` |
 
 
 ### 用户和权限管理
@@ -330,6 +332,51 @@ cargo doc --no-deps --document-private-items --release --open
 5. **修改文件所有者**：
    ```
    chown username file.txt
+   ```
+
+### 文本搜索
+
+使用 `grep` 命令在文件中搜索特定的文本模式：
+
+1. **基本搜索**：
+   ```
+   grep 'hello' file.txt          # 在file.txt中搜索包含'hello'的行
+   ```
+
+2. **不区分大小写搜索**：
+   ```
+   grep -i 'Hello' file.txt       # 不区分大小写搜索
+   ```
+
+3. **显示行号**：
+   ```
+   grep -n 'pattern' file.txt     # 显示匹配行的行号
+   ```
+
+4. **反向匹配**：
+   ```
+   grep -v 'pattern' file.txt     # 显示不包含pattern的行
+   ```
+
+5. **统计匹配行数**：
+   ```
+   grep -c 'pattern' file.txt     # 只显示匹配行的数量
+   ```
+
+6. **只显示文件名**：
+   ```
+   grep -l 'pattern' *.txt        # 只显示包含匹配的文件名
+   ```
+
+7. **多文件搜索**：
+   ```
+   grep 'pattern' file1.txt file2.txt  # 在多个文件中搜索
+   ```
+
+8. **组合选项**：
+   ```
+   grep -in 'hello' file.txt      # 不区分大小写 + 显示行号
+   grep -c -i 'hello' *.txt       # 不区分大小写 + 统计匹配数
    ```
 
 ### 故障排除
@@ -646,4 +693,68 @@ Name
 ```
 [/] exit
 Connection closed.
+```
+
+### 18. 文本搜索 (grep命令)
+```
+# 创建测试文件
+[/root] touch test.txt
+[/root] write test.txt
+Hello World
+This is a test file
+HELLO again
+Case sensitive test
+End of file
+
+# 基本搜索
+[/root] grep Hello test.txt
+Hello World
+
+# 不区分大小写搜索
+[/root] grep -i hello test.txt
+Hello World
+HELLO again
+
+# 显示行号
+[/root] grep -n test test.txt
+2:This is a test file
+4:Case sensitive test
+
+# 反向匹配
+[/root] grep -v test test.txt
+Hello World
+HELLO again
+End of file
+
+# 统计匹配行数
+[/root] grep -c Hello test.txt
+1
+
+# 创建第二个文件进行多文件搜索
+[/root] touch test2.txt
+[/root] write test2.txt
+Another hello
+Multiple files test
+Final line
+
+# 多文件搜索
+[/root] grep hello test.txt test2.txt
+test2.txt:Another hello
+
+# 只显示包含匹配的文件名
+[/root] grep -l hello test.txt test2.txt
+test2.txt
+
+# 组合选项：不区分大小写 + 显示行号
+[/root] grep -in hello test.txt test2.txt
+test.txt:1:Hello World
+test.txt:3:HELLO again
+test2.txt:1:Another hello
+
+# 其他组合选项示例
+[/root] grep -cv hello test.txt
+5
+
+[/root] grep -il HELLO test.txt test2.txt
+test.txt
 ```

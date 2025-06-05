@@ -49,24 +49,54 @@ EXAMPLES:
 
         // Parse arguments
         while i < argv.len() {
-            match argv[i] {
-                "-i" | "--ignore-case" => ignore_case = true,
-                "-n" | "--line-number" => line_number = true,
-                "-v" | "--invert-match" => invert_match = true,
-                "-c" | "--count" => count_only = true,
-                "-l" | "--files-with-matches" => files_with_matches = true,
-                "-H" | "--with-filename" => with_filename = true,
-                "-h" | "--no-filename" => no_filename = true,
-                "--help" => {
-                    println!("{}", self.help());
-                    return;
-                }
-                arg => {
-                    if pattern.is_empty() {
-                        pattern = arg;
-                    } else {
-                        files.push(arg);
+            let arg = argv[i];
+            
+            if arg == "--help" {
+                println!("{}", self.help());
+                return;
+            } else if arg.starts_with("--") {
+                // Handle long options
+                match arg {
+                    "--ignore-case" => ignore_case = true,
+                    "--line-number" => line_number = true,
+                    "--invert-match" => invert_match = true,
+                    "--count" => count_only = true,
+                    "--files-with-matches" => files_with_matches = true,
+                    "--with-filename" => with_filename = true,
+                    "--no-filename" => no_filename = true,
+                    _ => {
+                        if pattern.is_empty() {
+                            pattern = arg;
+                        } else {
+                            files.push(arg);
+                        }
                     }
+                }
+            } else if arg.starts_with('-') && arg.len() > 1 {
+                // Handle short options (including combined ones like -in)
+                let chars: Vec<char> = arg.chars().skip(1).collect(); // Skip the '-'
+                for ch in chars {
+                    match ch {
+                        'i' => ignore_case = true,
+                        'n' => line_number = true,
+                        'v' => invert_match = true,
+                        'c' => count_only = true,
+                        'l' => files_with_matches = true,
+                        'H' => with_filename = true,
+                        'h' => no_filename = true,
+                        _ => {
+                            println!("grep: invalid option -- '{}'", ch);
+                            println!("Try 'grep --help' for more information.");
+                            return;
+                        }
+                    }
+                }
+            } else {
+                // Regular argument (pattern or filename)
+                if pattern.is_empty() {
+                    pattern = arg;
+                } else {
+                    files.push(arg);
                 }
             }
             i += 1;
