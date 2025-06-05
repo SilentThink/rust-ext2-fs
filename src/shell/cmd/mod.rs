@@ -11,6 +11,7 @@ mod cp;
 mod exit;
 mod format;
 mod help;
+mod history;
 mod ln;
 mod ls;
 mod mkdir;
@@ -32,7 +33,7 @@ pub mod login;
 
 use {
     cat::Cat, cd::Cd, chmod::Chmod, chown::Chown, clear::Clear, cp::Cp, exit::Exit, format::Format,
-    help::Help, ln::Ln, login::Login, ls::Ls, mkdir::Mkdir, mv::Mv, passwd::Passwd, pwd::Pwd, rm::Rm, rmdir::RmDir,
+    help::Help, history::History, ln::Ln, login::Login, ls::Ls, mkdir::Mkdir, mv::Mv, passwd::Passwd, pwd::Pwd, rm::Rm, rmdir::RmDir,
     touch::Touch, useradd::Useradd, userdel::UserDel, users::Users, whoami::Whoami, write::Write,
     zip::Zip, unzip::Unzip,
 };
@@ -74,6 +75,7 @@ pub fn cmds() -> Cmds {
         ("chown", Box::new(Chown) as Box<dyn Cmd + Send + Sync>),
         ("users", Box::new(Users) as Box<dyn Cmd + Send + Sync>),
         ("clear", Box::new(Clear) as Box<dyn Cmd + Send + Sync>),
+        ("history", Box::new(History) as Box<dyn Cmd + Send + Sync>),
         ("zip", Box::new(Zip) as Box<dyn Cmd + Send + Sync>),
         ("unzip", Box::new(Unzip) as Box<dyn Cmd + Send + Sync>),
     ]))

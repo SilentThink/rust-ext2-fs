@@ -75,6 +75,7 @@ impl Helper for SimpleCompleter {}
 pub struct Shell {
     pub fs: Fs,
     pub cmds: Cmds,
+    pub history: Vec<String>,
 }
 
 impl Shell {
@@ -97,7 +98,32 @@ impl Shell {
         Self {
             fs,
             cmds: cmd::cmds(),
+            history: Vec::new(),
         }
+    }
+
+    pub fn get_history(&self) -> &Vec<String> {
+        &self.history
+    }
+
+    pub fn clear_history(&mut self) {
+        self.history.clear();
+    }
+
+    pub fn add_to_history(&mut self, command: String) {
+        // 避免添加重复的连续命令
+        if let Some(last) = self.history.last() {
+            if last == &command {
+                return;
+            }
+        }
+        
+        // 限制历史记录大小，保留最近的1000条
+        if self.history.len() >= 1000 {
+            self.history.remove(0);
+        }
+        
+        self.history.push(command);
     }
 
     pub fn init_cmds(&mut self) {}
@@ -161,6 +187,9 @@ impl Shell {
                     if let Err(err) = rl.add_history_entry(input) {
                         eprintln!("Failed to add history entry: {}", err);
                     }
+
+                    // 将命令添加到我们自己的历史记录中
+                    self.add_to_history(input.to_string());
 
                     // 解析命令
                     let mut argv: Vec<&str> = input
@@ -237,8 +266,17 @@ impl Shell {
 
             let mut input = String::new();
             std::io::stdin().read_line(&mut input).unwrap();
+            let input = input.trim();
+            
+            // 如果输入为空，跳过
+            if input.is_empty() {
+                continue;
+            }
+            
+            // 将命令添加到历史记录中
+            self.add_to_history(input.to_string());
+            
             let mut argv: Vec<&str> = input
-                .trim()
                 .split(' ')
                 .map(|s| s.trim())
                 .filter(|s| !s.is_empty())
@@ -248,7 +286,14 @@ impl Shell {
                 continue;
             }
 
-            match cmds.get(argv.remove(0)) {
+            let cmd_name = argv.remove(0);
+
+            // 处理退出命令
+            if cmd_name == "exit" {
+                break;
+            }
+
+            match cmds.get(cmd_name) {
                 Some(cmd) => match argv.contains(&"-h") {
                     true => println!("{}", cmd.help()),
                     false => cmd.run(self, &argv),
