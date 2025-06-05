@@ -5,131 +5,321 @@ pub struct Unzip;
 
 impl Unzip {
     fn decompress_data(compressed_data: &[u8], original_size: usize) -> Result<Vec<u8>> {
-        let mut decompressed = Vec::with_capacity(original_size);
-        let mut i = 0;
+        if compressed_data.is_empty() {
+            return Ok(Vec::new());
+        }
         
-        while i < compressed_data.len() && decompressed.len() < original_size {
-            if compressed_data[i] == 0xFF {
-                if i + 1 < compressed_data.len() {
-                    if compressed_data[i + 1] == 0x00 {
-                        // 转义的0xFF字节
-                        decompressed.push(0xFF);
-                        i += 2;
-                    } else {
-                        // 压缩格式：0xFF + count + byte
-                        if i + 2 < compressed_data.len() {
-                            let count = compressed_data[i + 1];
-                            let byte_value = compressed_data[i + 2];
-                            
-                            for _ in 0..count {
-                                if decompressed.len() < original_size {
-                                    decompressed.push(byte_value);
+        // 检查压缩标记
+        let compression_flag = compressed_data[0];
+        let data_to_process = &compressed_data[1..];
+        
+        match compression_flag {
+            0x00 => {
+                // 未压缩数据，直接返回
+                Ok(data_to_process.to_vec())
+            },
+            0x01 => {
+                // 已压缩数据，使用RLE解压缩
+                let mut decompressed = Vec::with_capacity(original_size);
+                let mut i = 0;
+                
+                while i < data_to_process.len() && decompressed.len() < original_size {
+                    if data_to_process[i] == 0xFF {
+                        if i + 1 < data_to_process.len() {
+                            if data_to_process[i + 1] == 0x00 {
+                                // 转义的0xFF字节
+                                decompressed.push(0xFF);
+                                i += 2;
+                            } else {
+                                // 压缩格式：0xFF + count + byte
+                                if i + 2 < data_to_process.len() {
+                                    let count = data_to_process[i + 1];
+                                    let byte_value = data_to_process[i + 2];
+                                    
+                                    for _ in 0..count {
+                                        if decompressed.len() < original_size {
+                                            decompressed.push(byte_value);
+                                        }
+                                    }
+                                    i += 3;
+                                } else {
+                                    // 数据不完整
+                                    break;
                                 }
                             }
-                            i += 3;
                         } else {
                             // 数据不完整
                             break;
                         }
+                    } else {
+                        // 普通字节
+                        decompressed.push(data_to_process[i]);
+                        i += 1;
                     }
-                } else {
-                    // 数据不完整
-                    break;
                 }
-            } else {
-                // 普通字节
-                decompressed.push(compressed_data[i]);
-                i += 1;
+                
+                Ok(decompressed)
+            },
+            _ => {
+                // 未知压缩格式，尝试使用旧的解压缩方法
+                let mut decompressed = Vec::with_capacity(original_size);
+                let mut i = 0;
+                
+                while i < compressed_data.len() && decompressed.len() < original_size {
+                    if compressed_data[i] == 0xFF {
+                        if i + 1 < compressed_data.len() {
+                            if compressed_data[i + 1] == 0x00 {
+                                // 转义的0xFF字节
+                                decompressed.push(0xFF);
+                                i += 2;
+                            } else {
+                                // 压缩格式：0xFF + count + byte
+                                if i + 2 < compressed_data.len() {
+                                    let count = compressed_data[i + 1];
+                                    let byte_value = compressed_data[i + 2];
+                                    
+                                    for _ in 0..count {
+                                        if decompressed.len() < original_size {
+                                            decompressed.push(byte_value);
+                                        }
+                                    }
+                                    i += 3;
+                                } else {
+                                    // 数据不完整
+                                    break;
+                                }
+                            }
+                        } else {
+                            // 数据不完整
+                            break;
+                        }
+                    } else {
+                        // 普通字节
+                        decompressed.push(compressed_data[i]);
+                        i += 1;
+                    }
+                }
+                
+                Ok(decompressed)
             }
         }
+    }
+
+    // 辅助函数：读取路径字符串
+    fn read_path_string(archive_data: &[u8], offset: usize, path_len: usize) -> Result<String> {
+        if offset + path_len > archive_data.len() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Invalid archive format: incomplete path"
+            ));
+        }
         
-        Ok(decompressed)
+        String::from_utf8(archive_data[offset..offset + path_len].to_vec())
+            .map_err(|_| std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Invalid path encoding"
+            ))
+    }
+
+    // 辅助函数：解析标准格式文件条目
+    fn parse_standard_entry(archive_data: &[u8], offset: &mut usize, use_u16: bool) -> Result<(String, Vec<u8>)> {
+        // 读取路径长度
+        let path_len = if use_u16 {
+            if *offset + 2 > archive_data.len() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Invalid archive format: incomplete path length"
+                ));
+            }
+            let len = u16::from_le_bytes([archive_data[*offset], archive_data[*offset + 1]]) as usize;
+            *offset += 2;
+            len
+        } else {
+            if *offset + 4 > archive_data.len() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Invalid archive format: incomplete path length"
+                ));
+            }
+            let len = u32::from_le_bytes([
+                archive_data[*offset], archive_data[*offset + 1],
+                archive_data[*offset + 2], archive_data[*offset + 3]
+            ]) as usize;
+            *offset += 4;
+            len
+        };
+        
+        // 读取路径
+        let path = Self::read_path_string(archive_data, *offset, path_len)?;
+        *offset += path_len;
+        
+        // 读取原始大小和压缩大小
+        let (original_size, compressed_size) = if use_u16 {
+            if *offset + 4 > archive_data.len() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Invalid archive format: incomplete size information"
+                ));
+            }
+            let orig = u16::from_le_bytes([archive_data[*offset], archive_data[*offset + 1]]) as usize;
+            let comp = u16::from_le_bytes([archive_data[*offset + 2], archive_data[*offset + 3]]) as usize;
+            *offset += 4;
+            (orig, comp)
+        } else {
+            if *offset + 8 > archive_data.len() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Invalid archive format: incomplete size information"
+                ));
+            }
+            let orig = u32::from_le_bytes([
+                archive_data[*offset], archive_data[*offset + 1],
+                archive_data[*offset + 2], archive_data[*offset + 3]
+            ]) as usize;
+            let comp = u32::from_le_bytes([
+                archive_data[*offset + 4], archive_data[*offset + 5],
+                archive_data[*offset + 6], archive_data[*offset + 7]
+            ]) as usize;
+            *offset += 8;
+            (orig, comp)
+        };
+        
+        // 读取压缩数据
+        if *offset + compressed_size > archive_data.len() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Invalid archive format: incomplete compressed data"
+            ));
+        }
+        
+        let compressed_data = &archive_data[*offset..*offset + compressed_size];
+        *offset += compressed_size;
+        
+        // 解压缩数据
+        let decompressed_data = Self::decompress_data(compressed_data, original_size)?;
+        
+        Ok((path, decompressed_data))
     }
 
     fn parse_archive(archive_data: &[u8]) -> Result<Vec<(String, Vec<u8>)>> {
         let mut files = Vec::new();
         let mut offset = 0;
         
-        // 读取文件数量
-        if archive_data.len() < 4 {
+        if archive_data.is_empty() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
-                "Invalid archive format: missing file count"
+                "Empty archive file"
             ));
         }
         
-        let file_count = u32::from_le_bytes([
-            archive_data[0], archive_data[1], archive_data[2], archive_data[3]
-        ]) as usize;
-        offset += 4;
+        // 检查格式标记
+        let format_flag = archive_data[0];
+        offset += 1;
         
-        // 解析每个文件
-        for _ in 0..file_count {
-            // 读取路径长度
-            if offset + 4 > archive_data.len() {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "Invalid archive format: incomplete path length"
-                ));
+        match format_flag {
+            0xCC => {
+                // 紧凑格式
+                if archive_data.len() < 2 {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "Invalid compact archive format"
+                    ));
+                }
+                
+                let file_count = archive_data[1] as usize;
+                offset += 1;
+                
+                // 读取索引表
+                let mut file_info = Vec::new();
+                for _ in 0..file_count {
+                    if offset + 3 > archive_data.len() {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            "Invalid compact archive: incomplete index table"
+                        ));
+                    }
+                    
+                    let path_len = archive_data[offset] as usize;
+                    let data_len = u16::from_le_bytes([
+                        archive_data[offset + 1], archive_data[offset + 2]
+                    ]) as usize;
+                    
+                    file_info.push((path_len, data_len));
+                    offset += 3;
+                }
+                
+                // 读取路径
+                let mut paths = Vec::new();
+                for (path_len, _) in &file_info {
+                    if offset + path_len + 1 > archive_data.len() {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            "Invalid compact archive: incomplete path data"
+                        ));
+                    }
+                    
+                    let path = Self::read_path_string(archive_data, offset, *path_len)?;
+                    paths.push(path);
+                    offset += path_len + 1; // +1 for null separator
+                }
+                
+                // 读取文件数据
+                for (i, (_, data_len)) in file_info.iter().enumerate() {
+                    if offset + data_len > archive_data.len() {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            "Invalid compact archive: incomplete file data"
+                        ));
+                    }
+                    
+                    let data = archive_data[offset..offset + data_len].to_vec();
+                    files.push((paths[i].clone(), data));
+                    offset += data_len;
+                }
+            },
+            0xFF => {
+                // 标准格式（新版本，使用u16长度字段）
+                if archive_data.len() < 5 {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "Invalid standard archive format"
+                    ));
+                }
+                
+                let file_count = u32::from_le_bytes([
+                    archive_data[1], archive_data[2], archive_data[3], archive_data[4]
+                ]) as usize;
+                offset += 4;
+                
+                // 解析每个文件
+                for _ in 0..file_count {
+                    let (path, data) = Self::parse_standard_entry(archive_data, &mut offset, true)?;
+                    files.push((path, data));
+                }
+            },
+            _ => {
+                // 旧格式兼容性：回退到原始解析方式
+                offset = 0; // 重置偏移量
+                
+                // 读取文件数量
+                if archive_data.len() < 4 {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "Invalid archive format: missing file count"
+                    ));
+                }
+                
+                let file_count = u32::from_le_bytes([
+                    archive_data[0], archive_data[1], archive_data[2], archive_data[3]
+                ]) as usize;
+                offset += 4;
+                
+                // 解析每个文件（旧格式，使用u32长度字段）
+                for _ in 0..file_count {
+                    let (path, data) = Self::parse_standard_entry(archive_data, &mut offset, false)?;
+                    files.push((path, data));
+                }
             }
-            
-            let path_len = u32::from_le_bytes([
-                archive_data[offset], archive_data[offset + 1],
-                archive_data[offset + 2], archive_data[offset + 3]
-            ]) as usize;
-            offset += 4;
-            
-            // 读取路径
-            if offset + path_len > archive_data.len() {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "Invalid archive format: incomplete path"
-                ));
-            }
-            
-            let path = String::from_utf8(
-                archive_data[offset..offset + path_len].to_vec()
-            ).map_err(|_| std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "Invalid archive format: invalid path encoding"
-            ))?;
-            offset += path_len;
-            
-            // 读取原始大小和压缩大小
-            if offset + 8 > archive_data.len() {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "Invalid archive format: incomplete size information"
-                ));
-            }
-            
-            let original_size = u32::from_le_bytes([
-                archive_data[offset], archive_data[offset + 1],
-                archive_data[offset + 2], archive_data[offset + 3]
-            ]) as usize;
-            offset += 4;
-            
-            let compressed_size = u32::from_le_bytes([
-                archive_data[offset], archive_data[offset + 1],
-                archive_data[offset + 2], archive_data[offset + 3]
-            ]) as usize;
-            offset += 4;
-            
-            // 读取压缩数据
-            if offset + compressed_size > archive_data.len() {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "Invalid archive format: incomplete compressed data"
-                ));
-            }
-            
-            let compressed_data = &archive_data[offset..offset + compressed_size];
-            offset += compressed_size;
-            
-            // 解压缩数据
-            let decompressed_data = Self::decompress_data(compressed_data, original_size)?;
-            
-            files.push((path, decompressed_data));
         }
         
         Ok(files)

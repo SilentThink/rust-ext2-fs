@@ -28,6 +28,7 @@ src
 │  │  ├── create.rs  // 创建文件 / 创建文件夹
 │  │  ├── format.rs  // 格式化文件系统
 │  │  ├── init.rs    // 从磁盘初始化文件系统
+│  │  ├── link.rs    // 硬链接支持
 │  │  ├── login.rs   // 登录 / 切换用户
 │  │  ├── mod.rs    
 │  │  ├── open.rs    // 打开文件
@@ -38,6 +39,7 @@ src
 │  │  ├── rm.rs      // 删除文件
 │  │  ├── rmdir.rs   // 删除空文件夹
 │  │  ├── seek.rs    // 修改文件指针
+│  │  ├── symlink.rs // 软链接支持
 │  │  ├── useradd.rs // 添加用户
 │  │  ├── userdel.rs // 删除用户
 │  │  └── write.rs   // 写文件
@@ -56,24 +58,29 @@ src
 │  │  ├── cd.rs      // 修改当前目录
 │  │  ├── chmod.rs   // 修改文件权限
 │  │  ├── chown.rs   // 修改文件拥有者
-│  │  ├── cp.rs      // 复制文件
+│  │  ├── clear.rs   // 清空终端屏幕
+│  │  ├── cp.rs      // 复制文件和目录
 │  │  ├── exit.rs    // 退出终端
 │  │  ├── format.rs  // 格式化
 │  │  ├── help.rs    // 显示帮助信息
+│  │  ├── ln.rs      // 创建硬链接和软链接
 │  │  ├── login.rs   // 切换用户
 │  │  ├── ls.rs      // 显示目录信息
 │  │  ├── mkdir.rs   // 创建文件夹
 │  │  ├── mod.rs
+│  │  ├── mv.rs      // 移动和重命名文件/目录
 │  │  ├── passwd.rs  // 修改密码
 │  │  ├── pwd.rs     // 查询当前目录
 │  │  ├── rm.rs      // 删除文件 / 文件夹
 │  │  ├── rmdir.rs   // 删除空文件夹
 │  │  ├── touch.rs   // 创建文件
+│  │  ├── unzip.rs   // 解压缩文件和目录
 │  │  ├── useradd.rs // 添加用户
 │  │  ├── userdel.rs // 删除用户
 │  │  ├── users.rs   // 显示用户/密码
 │  │  ├── whoami.rs  // 显示当前用户
-│  │  └── write.rs   // 写文件
+│  │  ├── write.rs   // 写文件
+│  │  └── zip.rs     // 压缩文件和目录
 │  └── mod.rs
 └── utils.rs
 ```
@@ -209,7 +216,7 @@ cargo doc --no-deps --document-private-items --release --open
 - [x] 在gui界面添加快捷方式的创建功能
 - [x] 实现fs压缩/解压缩功能,并添加对应的shell命令zip和unzip
 - [x] 拓展zip和unzip对目录的支持
-- [ ] 实现mv命令
+- [x] 实现mv命令
 - [ ] 本地终端shell实现记录历史命令,上下方向键浏览历史命令
 - [x] web shell实现记录历史命令,上下方向键浏览历史命令
 - [ ] shell实现tab键自动补全功能
@@ -274,8 +281,12 @@ cargo doc --no-deps --document-private-items --release --open
 | `write` | 写入文件内容 | `write file.txt` |
 | `rm` | 删除文件 | `rm file.txt` |
 | `rmdir` | 删除空文件夹 | `rmdir docs` |
+| `cp` | 复制文件和目录 | `cp file1.txt file2.txt` |
+| `mv` | 移动/重命名文件和目录 | `mv file1.txt file2.txt` |
 | `ln` | 创建硬链接 | `ln target link_name` |
 | `ln -s` | 创建软链接 | `ln -s target link_name` |
+| `zip` | 压缩文件和目录 | `zip archive.zip file1.txt` |
+| `unzip` | 解压缩文件 | `unzip archive.zip` |
 | `useradd` | 添加用户 | `useradd username password` |
 | `userdel` | 删除用户 | `userdel username` |
 | `login` | 切换用户 | `login username` |
@@ -408,13 +419,136 @@ root             123
 alice             alice123 
 ```
 
-### 9. 压缩和解压文件
+### 9. 移动和重命名文件/目录
 ```
-todo:
+[/root/test] touch file1.txt file2.txt file3.txt
+[/root/test] mkdir dir1 dir2
+[/root/test] ls
+Name
+.
+..
+file1.txt
+file2.txt
+file3.txt
+dir1
+dir2
+
+# 重命名文件
+[/root/test] mv file1.txt renamefile.txt
+[/root/test] ls
+Name
+.
+..
+renamed_file.txt
+file2.txt
+file3.txt
+dir1
+dir2
+
+# 移动文件到目录
+[/root/test] mv file2.txt dir1/
+[/root/test] ls dir1
+Name
+.
+..
+file2.txt
+
+# 移动多个文件到目录
+[/root/test] mv file3.txt renamefile.txt dir2/
+[/root/test] ls dir2
+Name
+.
+..
+file3.txt
+renamed_file.txt
+
+# 重命名目录
+[/root/test] mv dir1 renamed_dir
+[/root/test] ls
+Name
+.
+..
+dir2
+renamed_dir
 ```
-### 10 同时删除多个文件
+
+### 10. 压缩和解压文件
 ```
-[/root/test]  rm file1.txt file2.txt
+[/root/test] touch data1.txt data2.txt
+[/root/test] write data1.txt
+111111111111111111111111111111111111111 data1!
+
+[/root/test] write data2.txt  
+222222222222222222222222222222222222222 data2!
+
+# 压缩多个文件（使用改进的自适应压缩算法）
+[/root/test] zip files.zip data1.txt data2.txt
+Archive created successfully!
+Files/directories compressed: 767
+Archive size: 59 bytes
+
+# 对比压缩前后的size
+[/root/test] ls -l
+Name       Mode      Owner  Size   Create Time              Edit Time              
+.          drwx:r-x  root   160 B  2025-06-05 03:30:52 UTC  2025-06-05 03:30:52 UTC
+..         drwx:r-x  root   96 B   2025-06-05 03:18:08 UTC  2025-06-05 03:18:08 UTC
+data1.txt  -rwx:r--  root   47 B   2025-06-05 03:30:59 UTC  2025-06-05 03:31:23 UTC
+data2.txt  -rwx:r--  root   47 B   2025-06-05 03:30:59 UTC  2025-06-05 03:31:31 UTC
+files.zip  -rwx:r--  root   59 B   2025-06-05 03:31:33 UTC  2025-06-05 03:31:33 UTC
+
+# 压缩目录（递归）
+[/root/test] mkdir backup
+[/root/test] touch backup/1
+[/root/test] touch backup/2
+[/root/test] zip -r backup.zip backup/
+Archive created successfully!
+Files/directories compressed: 590540
+Archive size: 28 bytes
+
+# 列出压缩文件内容
+[/root/test]  unzip -l files.zip
+Archive: files.zip
+  Length      Date    Time    Name
+---------  ---------- -----   ----
+       47  ---------- -----   data1.txt
+       47  ---------- -----   data2.txt
+---------                     -------
+       94                     2 files
+
+# 解压文件
+[/root/test] mkdir extracted
+[/root/test] unzip -d extracted files.zip
+Extracting 2 items from archive...
+Successfully extracted archive to 'extracted'
+
+[/root/test] ls extracted
+Name
+.
+..
+data1.txt
+data2.txt
+
+# 验证解压后的文件内容
+[/root/test] cat extracted/data1.txt
+111111111111111111111111111111111111111 data1!
+[/root/test] cat extracted/data2.txt
+222222222222222222222222222222222222222 data2!
+
+# 解压目录
+[/root/test] unzip -d ./restore backup.zip
+Extracting 2 items from archive...
+Successfully extracted archive to './restore'
+[/root/test] ls restore/backup
+Name
+.
+..
+1
+2
+```
+### 11. 同时删除多个文件
+```
+[/root/test] touch file1.txt file2.txt
+[/root/test] rm file1.txt file2.txt
 [/root/test] ls  
 Name
 .
@@ -425,7 +559,7 @@ files.zip
 file.txt
 ```
 
-### 11. 删除目录
+### 12. 删除目录
 ```
 [/] cd ..
 [/] mkdir test1
@@ -437,7 +571,7 @@ file.txt
 [/] rm -r test2
 ```
 
-### 12.权限修改
+### 13.权限修改
 ```
 [/root/test]cd file
 [/root/test/file] chmod rwx:r-- file1.txt
@@ -447,7 +581,7 @@ file.txt
 [/root]chown alice /root/file2.txt
 ```
 
-### 13. 切换用户
+### 14. 切换用户
 ```
 [/root/test] login
 :: default user: root, password: 123
@@ -477,7 +611,7 @@ root
 file.txt: Need write permission
 ```
 
-### 14. 所有权管理 (需root)的判断
+### 15. 所有权管理 (需root)的判断
 ```
 [/root/test/file] chown alice file1.txt
 Permission denied
@@ -485,7 +619,7 @@ Permission denied
 [/root] write file2.txt  #这里前面只设置了读权限，但是后来把整个文件的权限都给了alice用户，因此这里应该是成功的
 ```
 
-### 15. 格式化    
+### 16. 格式化    
 ```             
 [/]  format  
 !!! This opretion will wipe all data in this disk
@@ -498,7 +632,7 @@ Name
 [/home] 
 ```
 
-### 16. 退出系统
+### 17. 退出系统
 ```
 [/] exit
 Connection closed.

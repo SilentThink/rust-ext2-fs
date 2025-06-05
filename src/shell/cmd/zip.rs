@@ -5,14 +5,23 @@ pub struct Zip;
 
 impl Zip {
     fn compress_data(data: &[u8]) -> Result<Vec<u8>> {
-        // 简单的RLE (Run-Length Encoding) 压缩算法
-        let mut compressed = Vec::new();
-        
+        // 改进的压缩算法：先尝试RLE压缩，如果效果不好就直接存储原始数据
         if data.is_empty() {
-            return Ok(compressed);
+            return Ok(Vec::new());
         }
         
+        // 对于很小的文件（小于10字节），直接存储原始数据
+        if data.len() < 10 {
+            let mut result = Vec::new();
+            result.push(0x00); // 标记：未压缩数据
+            result.extend_from_slice(data);
+            return Ok(result);
+        }
+        
+        // 尝试RLE压缩
+        let mut compressed = Vec::new();
         let mut i = 0;
+        
         while i < data.len() {
             let current_byte = data[i];
             let mut count = 1u8;
@@ -24,27 +33,64 @@ impl Zip {
                 count += 1;
             }
             
-            // 如果连续字节数大于3，使用压缩格式
-            if count >= 3 {
+            // 如果连续字节数大于等于4，使用压缩格式
+            if count >= 4 {
                 compressed.push(0xFF); // 压缩标记
                 compressed.push(count);
                 compressed.push(current_byte);
             } else {
                 // 否则直接存储原始数据
-                for _ in 0..count {
+                for j in 0..count {
+                    let byte_to_store = data[i + j as usize];
                     // 如果原始数据是0xFF，需要转义
-                    if current_byte == 0xFF {
+                    if byte_to_store == 0xFF {
                         compressed.push(0xFF);
                         compressed.push(0x00); // 转义标记
                     }
-                    compressed.push(current_byte);
+                    compressed.push(byte_to_store);
                 }
             }
             
             i += count as usize;
         }
         
-        Ok(compressed)
+        // 检查压缩效果，如果压缩后大小没有明显减少，就使用原始数据
+        if compressed.len() >= data.len() * 9 / 10 { // 如果压缩率小于10%
+            let mut result = Vec::new();
+            result.push(0x00); // 标记：未压缩数据
+            result.extend_from_slice(data);
+            Ok(result)
+        } else {
+            let mut result = Vec::new();
+            result.push(0x01); // 标记：已压缩数据
+            result.extend_from_slice(&compressed);
+            Ok(result)
+        }
+    }
+
+    // 辅助函数：读取单个文件内容
+    fn read_file_content(shell: &mut Shell, path: &str) -> Result<Vec<u8>> {
+        let fd = shell.fs.open(path)?;
+        let mut file_data = Vec::new();
+        
+        loop {
+            let mut buf = [0u8; 512];
+            match shell.fs.read(fd, &mut buf) {
+                Ok(bytes_read) => {
+                    if bytes_read == 0 {
+                        break;
+                    }
+                    file_data.extend_from_slice(&buf[..bytes_read]);
+                }
+                Err(e) => {
+                    shell.fs.close(fd).ok();
+                    return Err(e);
+                }
+            }
+        }
+        
+        shell.fs.close(fd).ok();
+        Ok(file_data)
     }
 
     fn collect_files_recursive(shell: &mut Shell, path: &str, base_path: &str) -> Result<Vec<(String, Vec<u8>)>> {
@@ -96,27 +142,10 @@ impl Zip {
                         files.append(&mut sub_files);
                     }
                     FileType::File => {
-                         // 读取文件内容
-                         let fd = shell.fs.open(&full_path)?;
-                         let mut file_data = Vec::new();
-                         loop {
-                             let mut buf = [0u8; 512];
-                             match shell.fs.read(fd, &mut buf) {
-                                 Ok(bytes_read) => {
-                                     if bytes_read == 0 {
-                                         break;
-                                     }
-                                     file_data.extend_from_slice(&buf[..bytes_read]);
-                                 }
-                                 Err(e) => {
-                                     shell.fs.close(fd).ok();
-                                     return Err(e);
-                                 }
-                             }
-                         }
-                         shell.fs.close(fd).ok();
-                         files.push((relative_path, file_data));
-                     }
+                        // 读取文件内容
+                        let file_data = Self::read_file_content(shell, &full_path)?;
+                        files.push((relative_path, file_data));
+                    }
                     FileType::Symlink => {
                         // 处理符号链接（暂时跳过）
                         println!("Warning: Skipping symlink {}", relative_path);
@@ -133,24 +162,7 @@ impl Zip {
                     .to_string()
             };
             
-            let fd = shell.fs.open(path)?;
-            let mut file_data = Vec::new();
-            loop {
-                let mut buf = [0u8; 512];
-                match shell.fs.read(fd, &mut buf) {
-                    Ok(bytes_read) => {
-                        if bytes_read == 0 {
-                            break;
-                        }
-                        file_data.extend_from_slice(&buf[..bytes_read]);
-                    }
-                    Err(e) => {
-                        shell.fs.close(fd).ok();
-                        return Err(e);
-                    }
-                }
-            }
-            shell.fs.close(fd).ok();
+            let file_data = Self::read_file_content(shell, path)?;
             files.push((relative_path, file_data));
         }
         
@@ -160,6 +172,19 @@ impl Zip {
     fn create_archive(files: Vec<(String, Vec<u8>)>) -> Result<Vec<u8>> {
         let mut archive = Vec::new();
         
+        // 计算总数据大小，决定使用哪种格式
+        let total_data_size: usize = files.iter().map(|(_, data)| data.len()).sum();
+        let total_path_size: usize = files.iter().map(|(path, _)| path.len()).sum();
+        let estimated_overhead = files.len() * 17 + total_path_size; // 每文件17字节固定开销 + 路径长度
+        
+        // 如果总数据量小于100字节且开销比例过高，使用紧凑格式
+        if total_data_size < 100 && estimated_overhead > total_data_size {
+            return Self::create_compact_archive(files);
+        }
+        
+        // 写入格式标记（0xFF表示标准格式）
+        archive.push(0xFF);
+        
         // 写入文件数量
         let file_count = files.len() as u32;
         archive.extend_from_slice(&file_count.to_le_bytes());
@@ -168,7 +193,7 @@ impl Zip {
         for (path, data) in files {
             // 写入路径长度和路径
             let path_bytes = path.as_bytes();
-            let path_len = path_bytes.len() as u32;
+            let path_len = path_bytes.len() as u16; // 使用u16减少开销
             archive.extend_from_slice(&path_len.to_le_bytes());
             archive.extend_from_slice(path_bytes);
             
@@ -176,8 +201,8 @@ impl Zip {
             let compressed_data = Self::compress_data(&data)?;
             
             // 写入原始大小和压缩后大小
-            let original_size = data.len() as u32;
-            let compressed_size = compressed_data.len() as u32;
+            let original_size = data.len() as u16; // 对小文件使用u16
+            let compressed_size = compressed_data.len() as u16;
             archive.extend_from_slice(&original_size.to_le_bytes());
             archive.extend_from_slice(&compressed_size.to_le_bytes());
             
@@ -187,11 +212,41 @@ impl Zip {
         
         Ok(archive)
     }
+    
+    fn create_compact_archive(files: Vec<(String, Vec<u8>)>) -> Result<Vec<u8>> {
+        let mut archive = Vec::new();
+        
+        // 写入格式标记（0xCC表示紧凑格式）
+        archive.push(0xCC);
+        
+        // 写入文件数量
+        let file_count = files.len() as u8; // 紧凑格式限制最多255个文件
+        archive.push(file_count);
+        
+        // 写入文件索引表（路径长度 + 数据长度）
+        for (path, data) in &files {
+            archive.push(path.len() as u8);
+            archive.extend_from_slice(&(data.len() as u16).to_le_bytes());
+        }
+        
+        // 写入所有路径（用null分隔）
+        for (path, _) in &files {
+            archive.extend_from_slice(path.as_bytes());
+            archive.push(0); // null分隔符
+        }
+        
+        // 写入所有文件数据（不压缩，因为都是小文件）
+        for (_, data) in files {
+            archive.extend_from_slice(&data);
+        }
+        
+        Ok(archive)
+    }
 }
 
 impl Cmd for Zip {
     fn description(&self) -> String {
-        "Compress multiple files and directories into a single archive using RLE compression".into()
+        "Compress multiple files and directories into a single archive using adaptive compression".into()
     }
 
     fn run(&self, shell: &mut Shell, argv: &[&str]) {
@@ -328,7 +383,15 @@ impl Cmd for Zip {
 Usage: zip <archive_file> <file1> [file2] [file3] ...
        zip -r <archive_file> <directory1> [directory2] ...
 
-Compress files and directories using simple RLE (Run-Length Encoding) compression.
+Compress files and directories using adaptive compression algorithm.
+The algorithm automatically chooses between RLE compression and storing raw data
+based on compression effectiveness to ensure optimal file sizes.
+
+Compression features:
+- Small files (< 10 bytes): stored uncompressed to avoid overhead
+- RLE compression for files with repetitive data
+- Automatic fallback to raw storage if compression doesn't reduce size significantly
+- Multi-file archive format with individual file compression
 
 Options:
   -r    Recursively compress directories and their contents
@@ -343,7 +406,7 @@ Examples:
   zip -r project.zip src/ docs/              # Compress directories recursively
   zip data.zip *.txt                         # Compress all .txt files
 
-The compressed file contains a multi-file archive format with file paths and compressed data.",
+The compressed file contains a multi-file archive format with optimized compression.",
             self.description()
         )
     }
