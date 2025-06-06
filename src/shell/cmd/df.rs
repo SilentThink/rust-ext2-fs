@@ -136,51 +136,74 @@ impl Df {
 }
 
 impl Cmd for Df {
+    // 返回命令的描述信息
     fn description(&self) -> String {
+        // 返回命令的描述信息
         "显示文件系统的磁盘使用情况".to_string()
     }
 
+    // 实现命令的运行逻辑
     fn run(&self, shell: &mut Shell, argv: &[&str]) {
+        // 是否以人类可读的格式显示
         let mut human_readable = false;
+        // 是否显示inode信息
         let mut show_inodes = false;
+        // 是否显示详细信息
         let mut show_detailed = false;
 
-        // 解析命令行参数
+        // 遍历参数
         for &arg in argv {
+            // 如果参数为 -h 或 --human-readable，设置以人类可读的格式显示
             match arg {
+                // 如果参数为 -h 或 --human-readable，设置以人类可读的格式显示
                 "-h" | "--human-readable" => {
+                    // 设置以人类可读的格式显示
                     human_readable = true;
                 }
+                // 如果参数为 -i 或 --inodes，设置显示inode信息
                 "-i" | "--inodes" => {
+                    // 设置显示inode信息
                     show_inodes = true;
                 }
+                // 如果参数为 -v 或 --verbose，设置显示详细信息
                 "-v" | "--verbose" => {
+                    // 设置显示详细信息
                     show_detailed = true;
                 }
+                // 如果参数为 --help，显示帮助信息并返回
                 "--help" => {
+                    // 显示帮助信息
                     println!("{}", self.help());
                     return;
                 }
+                // 如果参数以 - 开头，打印错误信息并返回
                 arg if arg.starts_with('-') => {
+                    // 打印错误信息
                     println!("df: unknown option '{}'", arg);
                     println!("Try 'df --help' for more information.");
                     return;
                 }
                 _ => {
+                    // 打印错误信息
                     println!("df: filesystem path not supported");
                     return;
                 }
             }
         }
 
+        // 如果显示详细信息，显示详细信息
         if show_detailed {
+            // 显示详细信息
             Self::show_detailed_info(shell);
         } else {
+            // 显示文件系统信息
             Self::show_filesystem_info(shell, human_readable, show_inodes);
         }
     }
 
+    // 返回命令的帮助信息
     fn help(&self) -> String {
+        // 返回命令的帮助信息
         r#"Show filesystem disk space usage
 
 Usage: df [OPTION]...
