@@ -20,14 +20,20 @@ impl Fs {
 
     /// 创建文件或者目录
     fn _create(&mut self, path: &str, mode: FileType) -> Result<()> {
+        // 记录被删除的目录项地址
         let mut deleted_entry_addr = None;
 
+        // 解析路径
         let (path, name) = path.rsplit_once("/").unwrap_or((".", path));
+        // 获取父目录
         let parent_dir_entry = self.path_parse(path)?.dir_entry;
 
+        // 获取父目录inode
         // 检查对父目录的写权限
         let mut parent_inode = self.get_inode(parent_dir_entry.i_node)?;
+        // 如果用户没有写权限，返回错误
         if !parent_inode.i_mode.can_write(self.user) {
+            // 返回错误
             return Err(Error::new(
                 ErrorKind::PermissionDenied,
                 "Need write permission to directory",
@@ -57,11 +63,14 @@ impl Fs {
         // 分配索引节点
         let inode_i = self.alloc(BlkType::INode)?;
 
+        // 根据文件类型分配索引节点
         let inode = match mode {
+            // 如果文件类型为文件，分配索引节点
             FileType::File => Inode {
                 i_mode: FileMode::new(self.user, mode),
                 ..Default::default()
             },
+            // 如果文件类型为目录，分配索引节点
             FileType::Dir => {
                 // 填充索引节点的内容
                 let mut inode = Inode {
@@ -70,6 +79,7 @@ impl Fs {
                     ..Default::default()
                 };
 
+                // 分配数据块
                 let data_blk_i = inode.alloc_data_block(self)?;
 
                 // 将 . 和 .. 写入数据块
@@ -84,6 +94,7 @@ impl Fs {
                     .bytes(),
                     Fs::addr_data_blk(data_blk_i),
                 )?;
+                // 将 .. 写入数据块
                 self.disk.write_at(
                     DirEntry {
                         i_node: parent_dir_entry.i_node,
@@ -98,6 +109,7 @@ impl Fs {
 
                 inode
             }
+            // 如果文件类型为软链接，返回错误
             FileType::Symlink => {
                 // 软链接的创建在symlink.rs中单独实现
                 // 这里不应该被调用
