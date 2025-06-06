@@ -15,8 +15,8 @@ impl Df {
         let mut size = bytes as f64;
         let mut unit_index = 0;
 
-        while size >= 1024.0 && unit_index < UNITS.len() - 1 {
-            size /= 1024.0;
+        while size >= BLOCK_SIZE as f64 && unit_index < UNITS.len() - 1 {
+            size /= BLOCK_SIZE as f64;
             unit_index += 1;
         }
 
@@ -83,12 +83,12 @@ impl Df {
                          "/");
             } else {
                 println!("{:<15} {:>10} {:>10} {:>10} {:>6} {}", 
-                         "Filesystem", "1K-blocks", "Used", "Available", "Use%", "Mounted on");
+                         "Filesystem", "512B-blocks", "Used", "Available", "Use%", "Mounted on");
                 println!("{:<15} {:>10} {:>10} {:>10} {:>5}% {}", 
                          "ext2fs",
-                         total_bytes / 1024,
-                         used_bytes / 1024,
-                         free_bytes / 1024,
+                         total_bytes / 512,
+                         used_bytes / 512,
+                         free_bytes / 512,
                          usage_percent,
                          "/");
             }
