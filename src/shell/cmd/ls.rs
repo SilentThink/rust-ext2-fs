@@ -1,4 +1,4 @@
-use chrono::TimeZone;
+use chrono::{TimeZone, FixedOffset};
 use super::Cmd;
 use super::Shell;
 use crate::fs::*;
@@ -57,8 +57,16 @@ impl Ls {
                 let size = pretty_byte(i_node.i_size);
                 size_w = size.len().max(size_w);
 
-                let create_time = chrono::Utc.timestamp_opt(i_node.i_ctime as i64, 0).unwrap().to_string();
-                let edit_time = chrono::Utc.timestamp_opt(i_node.i_mtime as i64, 0).unwrap().to_string();
+                // 创建中国时区（东八区，UTC+8）
+                let china_tz = FixedOffset::east_opt(8 * 3600).unwrap();
+                let create_time = chrono::Utc.timestamp_opt(i_node.i_ctime as i64, 0).unwrap()
+                    .with_timezone(&china_tz)
+                    .format("%Y-%m-%d %H:%M:%S CST")
+                    .to_string();
+                let edit_time = chrono::Utc.timestamp_opt(i_node.i_mtime as i64, 0).unwrap()
+                    .with_timezone(&china_tz)
+                    .format("%Y-%m-%d %H:%M:%S CST")
+                    .to_string();
                 time_w = time_w.max(edit_time.len());
 
                 // 如果是软链接，显示链接目标
