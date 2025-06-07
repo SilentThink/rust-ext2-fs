@@ -461,6 +461,12 @@ file1.txt file2.txt hardlink symlink
 Hello World!This is a test file.
 [/root/test]  cat symlink 
 Hello World!This is a test file.
+
+[/root/test] rm file2.txt
+[/root/test] cat symlink
+symlink: file2.txt: No such file or directory
+[/root/test] rm file1.txt
+[/root/test] cat hardlink
 ```
 
 ### 8. 用户管理(创建和展示用户)
@@ -758,3 +764,7 @@ test2.txt:1:Another hello
 [/root] grep -il HELLO test.txt test2.txt
 test.txt
 ```
+
+### 19. df
+
+### 20. history
